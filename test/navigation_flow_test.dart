@@ -5,11 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:instagram_clone/app/app.dart';
 import 'package:instagram_clone/core/services/storage_service.dart';
-import 'package:instagram_clone/features/explore/explore_screen.dart';
-import 'package:instagram_clone/features/home/home_screen.dart';
-import 'package:instagram_clone/features/profile/profile_screen.dart';
-import 'package:instagram_clone/features/reels/reels_screen.dart';
-import 'package:instagram_clone/features/settings/settings_screen.dart';
+import 'package:instagram_clone/views/explore/explore_screen.dart';
+import 'package:instagram_clone/views/home/home_screen.dart';
+import 'package:instagram_clone/views/profile/profile_screen.dart';
+import 'package:instagram_clone/views/reels/reels_screen.dart';
+import 'package:instagram_clone/views/settings/settings_screen.dart';
 import 'package:instagram_clone/state/app_state.dart';
 
 void main() {

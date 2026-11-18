@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/authentication/login_screen.dart';
-import '../features/create_post/create_post_screen.dart';
-import '../features/home/post_detail_screen.dart';
-import '../features/messages/messages_screen.dart';
-import '../features/notifications/notifications_screen.dart';
-import '../features/profile/profile_screen.dart';
-import '../features/settings/settings_screen.dart';
-import '../features/splash/splash_screen.dart';
-import '../state/app_state.dart';
+import '../views/authentication/login_screen.dart';
+import '../views/create_post/create_post_screen.dart';
+import '../views/home/post_detail_screen.dart';
+import '../views/messages/messages_screen.dart';
+import '../views/notifications/notifications_screen.dart';
+import '../views/profile/profile_screen.dart';
+import '../views/settings/settings_screen.dart';
+import '../views/splash/splash_screen.dart';
+import '../controllers/auth_controller.dart';
 import 'main_shell.dart';
 
 /// Shared slowed transition used by every route in go_router 18.x, where the
@@ -55,7 +55,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
     redirect: (context, state) {
-      final loggedIn = ref.read(appProvider).isLoggedIn;
+      final loggedIn = ref.read(authControllerProvider).isLoggedIn;
       final location = state.matchedLocation;
       if (!loggedIn && location != '/login' && location != '/splash') {
         return '/login';

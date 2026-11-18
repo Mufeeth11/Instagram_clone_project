@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../state/app_state.dart';
+import '../controllers/settings_controller.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 
@@ -10,7 +10,9 @@ class InstagramApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(appProvider.select((s) => s.themeMode));
+    final themeMode = ref.watch(
+      settingsControllerProvider.select((c) => c.state.themeMode),
+    );
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'Instagram Clone',

@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/theme/app_theme.dart';
-import '../features/create_post/create_post_screen.dart';
-import '../features/explore/explore_screen.dart';
-import '../features/home/home_screen.dart';
-import '../features/profile/profile_screen.dart';
-import '../features/reels/reels_screen.dart';
-import '../state/navigation_state.dart';
+import '../views/create_post/create_post_screen.dart';
+import '../views/explore/explore_screen.dart';
+import '../views/home/home_screen.dart';
+import '../views/profile/profile_screen.dart';
+import '../views/reels/reels_screen.dart';
+import '../controllers/navigation_controller.dart';
 
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
@@ -70,10 +70,11 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   Widget build(BuildContext context) {
     // Riverpod only allows ref.listen during build, not in initState.
-    ref.listen(reelsOpenRequestProvider, (_, next) {
-      if (next == null) return;
+    ref.listen(navigationControllerProvider, (_, next) {
+      final request = next.reelsOpenRequest;
+      if (request == null) return;
       setState(() {
-        _reelsInitialIndex = next;
+        _reelsInitialIndex = request;
         _reelsOpenCount++;
         if (_index != 3) {
           _direction = 1;
@@ -81,7 +82,7 @@ class _MainShellState extends ConsumerState<MainShell>
         }
       });
       _transition.forward(from: 0);
-      ref.read(reelsOpenRequestProvider.notifier).clear();
+      ref.read(navigationControllerProvider).clearReelsRequest();
     });
 
     return Scaffold(

@@ -55,16 +55,21 @@ flutter test                      # data, persistence, widget + navigation flow 
 ```
 lib/
 ├── main.dart
-├── app/            app.dart, router.dart, main_shell.dart, theme/
-├── core/           constants, services/, storage/, utils/, widgets/
-├── models/         user, post, reel, story, comment, notification, chat
-├── data/           dummy_data/, repositories/, local/
-├── features/       splash, authentication, home, stories, reels, explore,
-│                   profile, settings, create_post, notifications, messages
-└── state/          app_state.dart (Riverpod notifier + persistence)
+├── app/            View: app.dart, router.dart, main_shell.dart, theme/
+├── controllers/    Controller: auth, feed, story, reels, explore, profile,
+│                   messages, notifications, settings, navigation
+├── views/          View: splash, authentication, home, stories, reels,
+│                   explore, profile, settings, create_post, notifications,
+│                   messages, widgets/
+├── models/         Model: user, post, reel, story, comment, notification, chat
+├── data/           Model: dummy_data/, repositories/, local/
+├── core/           Model/infrastructure: services/, storage/, utils/
+└── state/          Model: app_state.dart (Riverpod notifier + persistence)
 ```
 
-Key libraries: Flutter Material 3, Riverpod 3, GoRouter 18, SharedPreferences, video_player, image_picker, cached_network_image.
+MVC flow: every screen and widget in `views/` reads state and triggers actions through `controllers/`; controllers delegate to the unchanged persisted model store in `state/` and the entities/services in `models/`, `data/` and `core/`. No view talks to `appProvider` directly.
+
+Key libraries: Flutter Material 3, Riverpod 3, GoRouter 18, SharedPreferences, video_player, image_picker, cached_network_image, Lottie, liquid_pull_to_refresh.
 
 ## Local persistence
 

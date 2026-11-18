@@ -4,8 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:instagram_clone/core/services/storage_service.dart';
-import 'package:instagram_clone/features/authentication/login_screen.dart';
-import 'package:instagram_clone/features/splash/splash_screen.dart';
+import 'package:instagram_clone/views/authentication/login_screen.dart';
+import 'package:instagram_clone/views/splash/splash_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
