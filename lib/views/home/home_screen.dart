@@ -156,7 +156,10 @@ class HomeScreen extends ConsumerWidget {
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => StoryViewer(initialIndex: storyIndex),
+            builder: (_) => StoryViewer(
+                  storyId: story.id,
+                  initialIndex: storyIndex,
+                ),
           ),
         );
       },

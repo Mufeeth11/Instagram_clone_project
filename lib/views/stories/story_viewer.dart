@@ -15,9 +15,18 @@ import '../../controllers/messages_controller.dart';
 import '../../controllers/story_controller.dart';
 
 class StoryViewer extends ConsumerStatefulWidget {
+  /// Stable ID of the story the user tapped. Preferred over [initialIndex]
+  /// because the story list can change right after upload.
+  final String? storyId;
+
+  /// Fallback position kept for backward compatibility.
   final int initialIndex;
 
-  const StoryViewer({super.key, required this.initialIndex});
+  const StoryViewer({
+    super.key,
+    required this.initialIndex,
+    this.storyId,
+  });
 
   @override
   ConsumerState<StoryViewer> createState() => _StoryViewerState();
@@ -47,14 +56,36 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
   List<StoryModel> get _stories =>
       ref.read(storyControllerProvider).state.visibleStories;
 
+  /// Resolves the story to open by ID first, then falls back to the old index.
+  int _resolveInitialIndex() {
+    final stories = _stories;
+    if (stories.isEmpty) return 0;
+
+    if (widget.storyId != null) {
+      final byId = stories.indexWhere((s) => s.id == widget.storyId);
+      if (byId != -1) return byId;
+    }
+
+    if (widget.initialIndex >= 0 && widget.initialIndex < stories.length) {
+      return widget.initialIndex;
+    }
+    return 0;
+  }
+
   @override
   void initState() {
     super.initState();
-    _index = widget.initialIndex;
+    _index = _resolveInitialIndex();
     _pageController = PageController(initialPage: _index);
     _ticker = createTicker((_) => setState(() {}));
     _replyFocus.addListener(_handleReplyFocus);
-    _start();
+
+    // Let the route finish mounting before marking the story as viewed.
+    // markStoryViewed() updates persisted state, so doing it after the first
+    // frame avoids racing the upload rebuild that opened this viewer.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _start();
+    });
   }
 
   @override
