@@ -45,6 +45,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
   void _peopleSheet(List<String> ids, String title) {
     final state = ref.read(profileControllerProvider).state;
+    final visibleIds = ids.where((id) => !state.isBlocked(id)).toList();
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -62,9 +63,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             ),
             Expanded(
               child: ListView.builder(
-                itemCount: ids.length,
+                itemCount: visibleIds.length,
                 itemBuilder: (context, index) {
-                  final user = state.userById(ids[index]);
+                  final user = state.userById(visibleIds[index]);
                   if (user == null) return const SizedBox.shrink();
                   return ListTile(
                     leading: UserAvatar(
@@ -121,6 +122,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final user = targetId == null ? null : state.userById(targetId);
     final me = state.currentUser;
     final isMe = user != null && me?.id == user.id;
+    final blocked = !isMe && user != null && state.isBlocked(user.id);
     final scheme = Theme.of(context).colorScheme;
 
     if (user == null) {
@@ -133,16 +135,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       );
     }
 
-    final posts = state.posts.where((p) => p.userId == user.id).toList();
-    final reels = state.reels.where((r) => r.userId == user.id).toList();
-    final tagged = state.posts
+    final posts = state.visiblePosts
+        .where((p) => p.userId == user.id)
+        .toList();
+    final reels = state.visibleReels
+        .where((r) => r.userId == user.id)
+        .toList();
+    final tagged = state.visiblePosts
         .where((p) => p.taggedUserIds.contains(user.id))
         .toList();
     final saved = isMe
-        ? state.posts.where((p) => state.savedPosts.contains(p.id)).toList()
+        ? state.visiblePosts
+            .where((p) => state.savedPosts.contains(p.id))
+            .toList()
         : <PostModel>[];
     final savedReels = isMe
-        ? state.reels.where((r) => state.savedReels.contains(r.id)).toList()
+        ? state.visibleReels
+            .where((r) => state.savedReels.contains(r.id))
+            .toList()
         : <ReelModel>[];
 
     return Scaffold(
@@ -172,7 +182,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       .toggleBlockedUser(user.id);
                   FeedbackUtils.snack(
                     context,
-                    '${state.blockedUsers.contains(user.id) ? 'Unblocked' : 'Blocked'} @${user.username}',
+                    '${state.isBlocked(user.id) ? 'Unblocked' : 'Blocked'} @${user.username}',
                   );
                 }
               },
@@ -180,7 +190,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 PopupMenuItem(
                   value: 'block',
                   child: Text(
-                    state.blockedUsers.contains(user.id) ? 'Unblock' : 'Block',
+                    state.isBlocked(user.id) ? 'Unblock' : 'Block',
                   ),
                 ),
               ],
@@ -283,19 +293,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                               child: const Text('Edit profile'),
                             )
                           : FilledButton(
-                              onPressed: () {
-                                ref
-                                    .read(profileControllerProvider)
-                                    .toggleFollow(user.id);
-                                FeedbackUtils.snack(
-                                  context,
-                                  '${state.isFollowing(user.id) ? 'Unfollowed' : 'Following'} @${user.username}',
-                                );
-                              },
+                              onPressed: blocked
+                                  ? () => ref
+                                      .read(profileControllerProvider)
+                                      .toggleBlockedUser(user.id)
+                                  : () {
+                                      ref
+                                          .read(profileControllerProvider)
+                                          .toggleFollow(user.id);
+                                      FeedbackUtils.snack(
+                                        context,
+                                        '${state.isFollowing(user.id) ? 'Unfollowed' : 'Following'} @${user.username}',
+                                      );
+                                    },
                               child: Text(
-                                state.isFollowing(user.id)
-                                    ? 'Following'
-                                    : 'Follow',
+                                blocked
+                                    ? 'Unblock'
+                                    : (state.isFollowing(user.id)
+                                        ? 'Following'
+                                        : 'Follow'),
                               ),
                             ),
                     ),
@@ -304,6 +320,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       child: OutlinedButton(
                         onPressed: isMe
                             ? () => context.go('/main')
+                            : blocked
+                            ? null
                             : () => context.push('/messages', extra: user.id),
                         child: Text(isMe ? 'Share profile' : 'Message'),
                       ),

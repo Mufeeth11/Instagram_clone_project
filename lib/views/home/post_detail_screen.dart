@@ -16,7 +16,7 @@ class PostDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(feedControllerProvider).state;
     final post = state.posts.where((p) => p.id == postId).firstOrNull;
-    if (post == null) {
+    if (post == null || state.isBlocked(post.userId)) {
       return Scaffold(
         appBar: AppBar(title: const Text('Post')),
         body: const Center(child: Text('This post is no longer available.')),

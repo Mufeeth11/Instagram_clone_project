@@ -43,6 +43,10 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
     return (elapsed > 10000 ? 10000 : elapsed) / 10000;
   }
 
+  /// Stories from blocked users are never shown or navigated into.
+  List<StoryModel> get _stories =>
+      ref.read(storyControllerProvider).state.visibleStories;
+
   @override
   void initState() {
     super.initState();
@@ -77,7 +81,7 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
   void _start() {
     _advanceTimer?.cancel();
     final controller = ref.read(storyControllerProvider);
-    final stories = controller.state.stories;
+    final stories = _stories;
     if (_index < stories.length) {
       controller.markStoryViewed(stories[_index].id);
     }
@@ -93,7 +97,7 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
 
   void _goTo(int index) {
     _replyFocus.unfocus();
-    final count = ref.read(storyControllerProvider).state.stories.length;
+    final count = _stories.length;
     if (index < 0 || index >= count) {
       Navigator.of(context).pop();
       return;
@@ -175,9 +179,9 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
   void _sendReaction(String emoji) {
     final state = ref.read(storyControllerProvider).state;
     final me = state.currentUser;
-    if (me == null || _index >= state.stories.length) return;
-    final story = state.stories[_index];
-    if (story.userId == me.id) return;
+    if (me == null || _index >= state.visibleStories.length) return;
+    final story = state.visibleStories[_index];
+    if (story.userId == me.id || state.isBlocked(story.userId)) return;
     ref
         .read(messagesControllerProvider)
         .sendMessage(story.userId, emoji, autoReply: false);
@@ -195,9 +199,9 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
     if (text.isEmpty) return;
     final state = ref.read(storyControllerProvider).state;
     final me = state.currentUser;
-    if (me == null || _index >= state.stories.length) return;
-    final story = state.stories[_index];
-    if (story.userId == me.id) return;
+    if (me == null || _index >= state.visibleStories.length) return;
+    final story = state.visibleStories[_index];
+    if (story.userId == me.id || state.isBlocked(story.userId)) return;
     ref
         .read(messagesControllerProvider)
         .sendMessage(
@@ -213,11 +217,12 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(storyControllerProvider).state;
-    if (state.stories.isEmpty) {
+    final stories = state.visibleStories;
+    if (stories.isEmpty) {
       return const Scaffold(body: Center(child: Text('No stories yet')));
     }
-    if (_index >= state.stories.length) _index = state.stories.length - 1;
-    final story = state.stories[_index];
+    if (_index >= stories.length) _index = stories.length - 1;
+    final story = stories[_index];
     final user = state.userById(story.userId);
     final me = state.currentUser;
     final isMyStory = me?.id == story.userId;
@@ -236,13 +241,13 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
           children: [
             PageView.builder(
               controller: _pageController,
-              itemCount: state.stories.length,
+              itemCount: stories.length,
               onPageChanged: (index) {
                 setState(() => _index = index);
                 _start();
               },
               itemBuilder: (context, index) => _StoryMedia(
-                story: state.stories[index],
+                story: stories[index],
                 active: index == _index && !_paused,
               ),
             ),
@@ -266,7 +271,7 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
                       Expanded(
                         child: Row(
                           children: [
-                            for (var i = 0; i < state.stories.length; i++)
+                            for (var i = 0; i < stories.length; i++)
                               Expanded(
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -375,7 +380,9 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
                         ),
                       ),
                     ),
-                  if (me != null && !isMyStory)
+                  if (me != null &&
+                      !isMyStory &&
+                      !state.isBlocked(story.userId))
                     _StoryReplyBar(
                       controller: _replyController,
                       focusNode: _replyFocus,

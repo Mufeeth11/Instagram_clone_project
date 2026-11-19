@@ -29,13 +29,17 @@ class HomeScreen extends ConsumerWidget {
     final state = ref.read(feedControllerProvider).state;
     final me = state.currentUser;
     if (me == null) return;
-    final index = state.posts.length + 1;
+    final authors = state.users
+        .where((u) => u.id != me.id && !state.isBlocked(u.id))
+        .toList();
+    if (authors.isEmpty) return;
+    final index = state.visiblePosts.length + 1;
     ref
         .read(feedControllerProvider)
         .addPost(
           PostModel(
             id: 'p_refresh_${DateTime.now().microsecondsSinceEpoch}',
-            userId: 'u${index % 25}',
+            userId: authors[index % authors.length].id,
             caption: 'Fresh from the feed ✨ #new #discover',
             imageUrls: [AppDummyData.img('refresh$index')],
             location:
@@ -105,13 +109,14 @@ class HomeScreen extends ConsumerWidget {
     WidgetRef ref,
     AppState state,
     String myImageUrl,
+    List<StoryModel> stories,
   ) {
     return SizedBox(
       height: 176,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
-        itemCount: state.stories.length + 1,
+        itemCount: stories.length + 1,
         itemBuilder: (context, index) {
           final tilt = _storyTilts[index % _storyTilts.length];
           final lift = _storyLifts[index % _storyLifts.length];
@@ -120,7 +125,7 @@ class HomeScreen extends ConsumerWidget {
                   imageUrl: myImageUrl,
                   onTap: () => _addStory(context, ref),
                 )
-              : _buildStoryTile(context, state, index);
+              : _buildStoryTile(context, state, stories, index);
 
           return Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -134,9 +139,14 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStoryTile(BuildContext context, AppState state, int index) {
+  Widget _buildStoryTile(
+    BuildContext context,
+    AppState state,
+    List<StoryModel> stories,
+    int index,
+  ) {
     final storyIndex = index - 1;
-    final story = state.stories[storyIndex];
+    final story = stories[storyIndex];
     final user = state.userById(story.userId);
     return _StoryTile(
       imageUrl: story.mediaUrl,
@@ -157,7 +167,9 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(feedControllerProvider).state;
     final me = state.currentUser;
-    final unread = state.notifications.where((n) => !n.isRead).length;
+    final stories = state.visibleStories;
+    final posts = state.visiblePosts;
+    final unread = state.visibleNotifications.where((n) => !n.isRead).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -187,6 +199,7 @@ class HomeScreen extends ConsumerWidget {
                 ref,
                 state,
                 me?.profileImage ?? '',
+                stories,
               ),
             ),
             SliverToBoxAdapter(
@@ -206,7 +219,7 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '${Formatters.count(state.posts.length)} posts',
+                      '${Formatters.count(posts.length)} posts',
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -217,10 +230,10 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
             SliverList.builder(
-              itemCount: state.posts.length,
+              itemCount: posts.length,
               itemBuilder: (context, index) => PostCard(
-                post: state.posts[index],
-                heroId: state.posts[index].id,
+                post: posts[index],
+                heroId: posts[index].id,
               ),
             ),
           ],

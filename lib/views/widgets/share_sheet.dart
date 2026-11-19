@@ -30,7 +30,7 @@ class ShareSheet extends ConsumerWidget {
     final state = ref.watch(messagesControllerProvider).state;
     final me = state.currentUser;
     final people = state.users
-        .where((u) => u.id != me?.id && !state.blockedUsers.contains(u.id))
+        .where((u) => u.id != me?.id && !state.isBlocked(u.id))
         .take(8)
         .toList();
     final isReel = label == 'reel';

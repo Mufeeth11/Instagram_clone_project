@@ -98,10 +98,45 @@ class AppState {
 
   UserModel? userById(String id) => users.where((u) => u.id == id).firstOrNull;
 
-  List<CommentModel> commentsFor(String targetId) =>
-      comments.where((c) => c.targetId == targetId).toList().reversed.toList();
+  bool isBlocked(String userId) => blockedUsers.contains(userId);
 
-  List<CommentModel> rootCommentsFor(String targetId) => comments
+  /// Content owned by blocked users is hidden everywhere in the app.
+  List<PostModel> get visiblePosts =>
+      posts.where((p) => !isBlocked(p.userId)).toList();
+
+  List<ReelModel> get visibleReels =>
+      reels.where((r) => !isBlocked(r.userId)).toList();
+
+  List<StoryModel> get visibleStories =>
+      stories.where((s) => !isBlocked(s.userId)).toList();
+
+  List<NotificationModel> get visibleNotifications =>
+      notifications.where((n) => !isBlocked(n.userId)).toList();
+
+  /// Comments by blocked users — and replies under them — are hidden too.
+  /// The stored order has parents before replies, so one pass is enough.
+  List<CommentModel> get _visibleComments {
+    final result = <CommentModel>[];
+    final visibleIds = <String>{};
+    for (final comment in comments) {
+      final parentId = comment.parentId;
+      if (isBlocked(comment.userId) ||
+          (parentId != null && !visibleIds.contains(parentId))) {
+        continue;
+      }
+      result.add(comment);
+      visibleIds.add(comment.id);
+    }
+    return result;
+  }
+
+  List<CommentModel> commentsFor(String targetId) => _visibleComments
+      .where((c) => c.targetId == targetId)
+      .toList()
+      .reversed
+      .toList();
+
+  List<CommentModel> rootCommentsFor(String targetId) => _visibleComments
       .where((c) => c.targetId == targetId && c.parentId == null)
       .toList()
       .reversed
@@ -110,7 +145,7 @@ class AppState {
   /// All replies under a top-level comment, in the order they were added.
   List<CommentModel> repliesForRoot(String targetId, String rootId) {
     final byParent = <String, List<CommentModel>>{};
-    for (final comment in comments) {
+    for (final comment in _visibleComments) {
       final parentId = comment.parentId;
       if (comment.targetId != targetId || parentId == null) continue;
       byParent.putIfAbsent(parentId, () => <CommentModel>[]).add(comment);
@@ -128,10 +163,10 @@ class AppState {
   }
 
   CommentModel? commentById(String id) =>
-      comments.where((c) => c.id == id).firstOrNull;
+      _visibleComments.where((c) => c.id == id).firstOrNull;
 
   int commentCountFor(String targetId) =>
-      comments.where((c) => c.targetId == targetId).length;
+      _visibleComments.where((c) => c.targetId == targetId).length;
 
   int effectiveCommentLikeCount(CommentModel comment) =>
       comment.likeCount + (likedComments.contains(comment.id) ? 1 : 0);
@@ -298,9 +333,6 @@ class AppNotifier extends Notifier<AppState> {
         !PasswordHasher.verifyPassword(password, match.passwordHash)) {
       return 'Incorrect password. Try again.';
     }
-    if (state.blockedUsers.contains(match.id)) {
-      return 'This account is blocked locally.';
-    }
     _update(state.copyWith(currentUserId: match.id));
     return null;
   }
@@ -447,11 +479,14 @@ class AppNotifier extends Notifier<AppState> {
   }) {
     final me = state.currentUser;
     if (me == null || text.trim().isEmpty) return;
-    final parent = parentId == null
-        ? null
-        : state.comments
-              .where((c) => c.id == parentId && c.targetId == targetId)
-              .firstOrNull;
+    final parent = parentId == null ? null : state.commentById(parentId);
+    if (parentId != null && (parent == null || parent.targetId != targetId)) {
+      return;
+    }
+    final ownerId = targetType == 'reel'
+        ? state.reels.where((r) => r.id == targetId).firstOrNull?.userId
+        : state.posts.where((p) => p.id == targetId).firstOrNull?.userId;
+    if (ownerId != null && state.isBlocked(ownerId)) return;
     final comment = CommentModel(
       id: 'c_local_${DateTime.now().microsecondsSinceEpoch}',
       targetId: targetId,
@@ -503,7 +538,7 @@ class AppNotifier extends Notifier<AppState> {
 
   void toggleFollow(String userId) {
     final me = state.currentUser;
-    if (me == null || userId == me.id) return;
+    if (me == null || userId == me.id || state.isBlocked(userId)) return;
     final users = state.users.map((u) {
       if (u.id == me.id) {
         final following = List<String>.from(u.following);
@@ -559,6 +594,7 @@ class AppNotifier extends Notifier<AppState> {
   void clearSearchHistory() => _update(state.copyWith(searchHistory: const []));
 
   void toggleBlockedUser(String userId) {
+    if (userId == state.currentUserId) return;
     final set = Set<String>.from(state.blockedUsers);
     set.contains(userId) ? set.remove(userId) : set.add(userId);
     _update(state.copyWith(blockedUsers: set));
@@ -582,7 +618,9 @@ class AppNotifier extends Notifier<AppState> {
 
   void sendMessage(String threadUserId, String text, {bool autoReply = true}) {
     final me = state.currentUser;
-    if (me == null || text.trim().isEmpty) return;
+    if (me == null || text.trim().isEmpty || state.isBlocked(threadUserId)) {
+      return;
+    }
     final now = DateTime.now();
     addChatMessage(
       ChatMessageModel(
@@ -602,6 +640,7 @@ class AppNotifier extends Notifier<AppState> {
       'Let\'s do it!',
     ];
     Timer(const Duration(milliseconds: 1400), () {
+      if (state.isBlocked(threadUserId)) return;
       addChatMessage(
         ChatMessageModel(
           id: 'm_${DateTime.now().microsecondsSinceEpoch}',
@@ -614,6 +653,14 @@ class AppNotifier extends Notifier<AppState> {
     });
   }
 
-  void addChatMessage(ChatMessageModel message) =>
-      _update(state.copyWith(chatMessages: [...state.chatMessages, message]));
+  void addChatMessage(ChatMessageModel message) {
+    final me = state.currentUser;
+    if (me != null) {
+      final otherUserId = message.senderId == me.id
+          ? message.threadUserId
+          : message.senderId;
+      if (state.isBlocked(otherUserId)) return;
+    }
+    _update(state.copyWith(chatMessages: [...state.chatMessages, message]));
+  }
 }

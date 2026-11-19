@@ -41,7 +41,8 @@ class _ReelsScreenState extends ConsumerState<ReelsScreen> {
   @override
   void initState() {
     super.initState();
-    final reelCount = ref.read(reelsControllerProvider).state.reels.length;
+    final reelCount =
+        ref.read(reelsControllerProvider).state.visibleReels.length;
     _current = reelCount == 0
         ? 0
         : widget.initialIndex.clamp(0, reelCount - 1).toInt();
@@ -62,7 +63,7 @@ class _ReelsScreenState extends ConsumerState<ReelsScreen> {
     final state = ref.watch(reelsControllerProvider).state;
     final pixabayAsync = ref.watch(pixabayVideosProvider);
     final pixabayVideos = pixabayAsync.value ?? const <PixabayVideo>[];
-    final reels = state.reels;
+    final reels = state.visibleReels;
     if (_current >= reels.length) _current = 0;
 
     return Scaffold(

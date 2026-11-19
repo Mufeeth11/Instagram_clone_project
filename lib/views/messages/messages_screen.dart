@@ -37,6 +37,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final text = _controller.text.trim();
     final thread = _thread;
     if (text.isEmpty || thread == null) return;
+    if (ref.read(messagesControllerProvider).state.isBlocked(thread)) return;
     ref.read(messagesControllerProvider).sendMessage(thread, text);
     _controller.clear();
   }
@@ -49,14 +50,17 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       ...state.chatMessages.map((m) => m.threadUserId),
       ...state.chatMessages.where((m) => m.senderId == me?.id).map((m) => m.threadUserId),
       for (var i = 1; i <= 6; i++) 'u$i',
-    }.toList();
+    }.where((id) => !state.isBlocked(id)).toList();
+    final thread = _thread != null && !state.isBlocked(_thread!)
+        ? _thread
+        : null;
 
-    if (_thread != null) {
-      final other = state.userById(_thread!);
+    if (thread != null) {
+      final other = state.userById(thread);
       final messages = state.chatMessages
           .where((m) =>
-              (m.threadUserId == _thread && m.senderId == me?.id) ||
-              (m.threadUserId == me?.id && m.senderId == _thread))
+              (m.threadUserId == thread && m.senderId == me?.id) ||
+              (m.threadUserId == me?.id && m.senderId == thread))
           .toList();
       return Scaffold(
         appBar: AppBar(

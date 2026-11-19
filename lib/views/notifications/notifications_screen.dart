@@ -13,7 +13,7 @@ class NotificationsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(notificationsControllerProvider).state;
-    final notifications = state.notifications;
+    final notifications = state.visibleNotifications;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notifications',

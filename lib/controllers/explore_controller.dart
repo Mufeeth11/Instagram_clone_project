@@ -18,7 +18,7 @@ class ExploreController extends AppController {
   void toggleFollow(String userId) => actions.toggleFollow(userId);
 
   void openFirstReel() {
-    if (state.reels.isEmpty) return;
+    if (state.visibleReels.isEmpty) return;
     ref.read(reelsOpenRequestProvider.notifier).open(0);
   }
 }

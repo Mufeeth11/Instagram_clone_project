@@ -46,13 +46,14 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
         : state.users
               .where(
                 (u) =>
-                    u.username.toLowerCase().contains(q) ||
-                    u.displayName.toLowerCase().contains(q),
+                    !state.isBlocked(u.id) &&
+                    (u.username.toLowerCase().contains(q) ||
+                        u.displayName.toLowerCase().contains(q)),
               )
               .toList();
     final posts = q.isEmpty
         ? <PostModel>[]
-        : state.posts
+        : state.visiblePosts
               .where(
                 (p) =>
                     p.caption.toLowerCase().contains(q) ||
@@ -61,7 +62,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               .toList();
     final tags = <String>{};
     if (q.isNotEmpty) {
-      for (final post in state.posts) {
+      for (final post in state.visiblePosts) {
         for (final tag in Formatters.hashtags(post.caption)) {
           if (tag.toLowerCase().contains(q)) tags.add(tag.toLowerCase());
         }
@@ -73,7 +74,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           (u) =>
               u.id != state.currentUserId &&
               !state.isFollowing(u.id) &&
-              !state.blockedUsers.contains(u.id),
+              !state.isBlocked(u.id),
         )
         .take(8)
         .toList();
@@ -244,8 +245,12 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     // Use the same first video here so the preview matches what Reels shows.
     final pixabayVideos =
         ref.watch(pixabayVideosProvider).value ?? const <PixabayVideo>[];
-    final featuredReel = state.reels.first;
-    final featuredThumbnail = pixabayVideos.isEmpty
+    final reels = state.visibleReels;
+    final posts = state.visiblePosts;
+    final featuredReel = reels.isEmpty ? null : reels.first;
+    final featuredThumbnail = featuredReel == null
+        ? ''
+        : pixabayVideos.isEmpty
         ? featuredReel.thumbnailUrl
         : pixabayVideos.first.thumbnailUrl.isNotEmpty
         ? pixabayVideos.first.thumbnailUrl
@@ -355,94 +360,104 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ),
           ),
         ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 18, 14, 8),
-            child: Text(
-              'Trending now',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        if (reels.isNotEmpty || posts.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 18, 14, 8),
+              child: Text(
+                'Trending now',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
             ),
           ),
-        ),
-        SliverToBoxAdapter(
-          child: GestureDetector(
-            onTap: _openFeaturedReel,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: SizedBox(
-                  height: 170,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      AppImage(url: featuredThumbnail, fit: BoxFit.cover),
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.transparent, Colors.black87],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
+        if (featuredReel != null)
+          SliverToBoxAdapter(
+            child: GestureDetector(
+              onTap: _openFeaturedReel,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: SizedBox(
+                    height: 170,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        AppImage(url: featuredThumbnail, fit: BoxFit.cover),
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.transparent, Colors.black87],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        left: 16,
-                        bottom: 14,
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.movie,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Reel of the day · @${state.userById(state.reels.first.userId)?.username ?? ''}',
-                              style: const TextStyle(
+                        Positioned(
+                          left: 16,
+                          bottom: 14,
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.movie,
                                 color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
+                                size: 18,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 8),
+                              Text(
+                                'Reel of the day · @${state.userById(featuredReel.userId)?.username ?? ''}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.all(12),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 3,
-              mainAxisSpacing: 3,
+        if (posts.isEmpty)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: Text('No posts to explore yet.')),
             ),
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final post = state.posts[index % state.posts.length];
-              return GestureDetector(
-                onTap: () => context.push('/post/${post.id}'),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    AppImage(url: post.imageUrls.first),
-                    if (index % 7 == 0)
-                      const Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Icon(Icons.movie, color: Colors.white, size: 16),
-                      ),
-                  ],
-                ),
-              );
-            }, childCount: state.posts.length),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.all(12),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 3,
+                mainAxisSpacing: 3,
+              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final post = posts[index];
+                return GestureDetector(
+                  onTap: () => context.push('/post/${post.id}'),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      AppImage(url: post.imageUrls.first),
+                      if (index % 7 == 0)
+                        const Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Icon(Icons.movie, color: Colors.white, size: 16),
+                        ),
+                    ],
+                  ),
+                );
+              }, childCount: posts.length),
+            ),
           ),
-        ),
       ],
     );
   }
