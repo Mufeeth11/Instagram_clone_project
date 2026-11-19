@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../core/utils/feedback.dart';
 import '../../core/utils/formatters.dart';
 import '../widgets/app_image.dart';
 import '../widgets/user_avatar.dart';
 import '../../models/story_model.dart';
+import '../../controllers/messages_controller.dart';
 import '../../controllers/story_controller.dart';
 
 class StoryViewer extends ConsumerStatefulWidget {
@@ -29,6 +31,11 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
   Timer? _advanceTimer;
   late int _index;
   bool _paused = false;
+  bool _holdPaused = false;
+  bool _focusPaused = false;
+  final _replyController = TextEditingController();
+  final _replyFocus = FocusNode();
+  String? _floatingReaction;
 
   /// One single source of truth for both the bar and the auto-advance timer.
   double get _progressValue {
@@ -42,6 +49,7 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
     _index = widget.initialIndex;
     _pageController = PageController(initialPage: _index);
     _ticker = createTicker((_) => setState(() {}));
+    _replyFocus.addListener(_handleReplyFocus);
     _start();
   }
 
@@ -50,6 +58,9 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
     _advanceTimer?.cancel();
     _ticker?.dispose();
     _pageController.dispose();
+    _replyFocus.removeListener(_handleReplyFocus);
+    _replyFocus.dispose();
+    _replyController.dispose();
     super.dispose();
   }
 
@@ -71,6 +82,8 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
       controller.markStoryViewed(stories[_index].id);
     }
     _paused = false;
+    _holdPaused = false;
+    _focusPaused = false;
     _watch
       ..reset()
       ..start();
@@ -79,15 +92,18 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
   }
 
   void _goTo(int index) {
+    _replyFocus.unfocus();
     final count = ref.read(storyControllerProvider).state.stories.length;
     if (index < 0 || index >= count) {
       Navigator.of(context).pop();
       return;
     }
     setState(() => _index = index);
-    _pageController.animateToPage(index,
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOutCubic);
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeInOutCubic,
+    );
     _start();
   }
 
@@ -106,17 +122,92 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
     }
   }
 
-  void _togglePause() {
-    setState(() => _paused = !_paused);
-    if (_paused) {
-      _watch.stop();
-      _ticker?.stop();
-      _advanceTimer?.cancel();
-    } else {
-      _watch.start();
-      if (!_ticker!.isActive) _ticker!.start();
-      _scheduleAdvance();
+  void _pause() {
+    if (_paused) return;
+    setState(() => _paused = true);
+    _watch.stop();
+    _ticker?.stop();
+    _advanceTimer?.cancel();
+  }
+
+  void _resume() {
+    if (!_paused) return;
+    setState(() => _paused = false);
+    _watch.start();
+    if (!_ticker!.isActive) _ticker!.start();
+    _scheduleAdvance();
+  }
+
+  void _togglePause() => _paused ? _resume() : _pause();
+
+  void _handleReplyFocus() {
+    if (_replyFocus.hasFocus) {
+      if (!_paused) {
+        _focusPaused = true;
+        _pause();
+      }
+    } else if (_focusPaused) {
+      _focusPaused = false;
+      _resume();
     }
+  }
+
+  void _onHoldStart(LongPressStartDetails _) {
+    if (_paused || _replyFocus.hasFocus) return;
+    _holdPaused = true;
+    _pause();
+  }
+
+  void _onHoldEnd(LongPressEndDetails _) {
+    if (!_holdPaused) return;
+    _holdPaused = false;
+    _resume();
+  }
+
+  Widget _tapZone({required VoidCallback onTap}) => GestureDetector(
+    onTap: onTap,
+    onLongPressStart: _onHoldStart,
+    onLongPressEnd: _onHoldEnd,
+    behavior: HitTestBehavior.opaque,
+    child: const SizedBox.expand(),
+  );
+
+  void _sendReaction(String emoji) {
+    final state = ref.read(storyControllerProvider).state;
+    final me = state.currentUser;
+    if (me == null || _index >= state.stories.length) return;
+    final story = state.stories[_index];
+    if (story.userId == me.id) return;
+    ref
+        .read(messagesControllerProvider)
+        .sendMessage(story.userId, emoji, autoReply: false);
+    setState(() => _floatingReaction = emoji);
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (mounted && _floatingReaction == emoji) {
+        setState(() => _floatingReaction = null);
+      }
+    });
+    FeedbackUtils.tap();
+  }
+
+  void _sendReply() {
+    final text = _replyController.text.trim();
+    if (text.isEmpty) return;
+    final state = ref.read(storyControllerProvider).state;
+    final me = state.currentUser;
+    if (me == null || _index >= state.stories.length) return;
+    final story = state.stories[_index];
+    if (story.userId == me.id) return;
+    ref
+        .read(messagesControllerProvider)
+        .sendMessage(
+          story.userId,
+          'Replied to your story: $text',
+          autoReply: false,
+        );
+    _replyController.clear();
+    _replyFocus.unfocus();
+    FeedbackUtils.snack(context, 'Reply sent');
   }
 
   @override
@@ -128,6 +219,8 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
     if (_index >= state.stories.length) _index = state.stories.length - 1;
     final story = state.stories[_index];
     final user = state.userById(story.userId);
+    final me = state.currentUser;
+    final isMyStory = me?.id == story.userId;
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -153,28 +246,15 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
                 active: index == _index && !_paused,
               ),
             ),
-            // Tap zones
+            // Tap zones: tap for next/previous/pause, hold anywhere to pause.
             Row(
               children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: _previous,
-                    behavior: HitTestBehavior.translucent,
-                  ),
-                ),
+                Expanded(child: _tapZone(onTap: _previous)),
                 SizedBox(
                   width: MediaQuery.of(context).size.width * .4,
-                  child: GestureDetector(
-                    onTap: _togglePause,
-                    behavior: HitTestBehavior.translucent,
-                  ),
+                  child: _tapZone(onTap: _togglePause),
                 ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: _next,
-                    behavior: HitTestBehavior.translucent,
-                  ),
-                ),
+                Expanded(child: _tapZone(onTap: _next)),
               ],
             ),
             SafeArea(
@@ -190,7 +270,8 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
                               Expanded(
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 1.5),
+                                    horizontal: 1.5,
+                                  ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(3),
                                     child: LinearProgressIndicator(
@@ -198,8 +279,9 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
                                           ? 1
                                           : (i == _index ? _progressValue : 0),
                                       minHeight: 2.5,
-                                      backgroundColor:
-                                          Colors.white.withValues(alpha: .35),
+                                      backgroundColor: Colors.white.withValues(
+                                        alpha: .35,
+                                      ),
                                       color: Colors.white,
                                     ),
                                   ),
@@ -213,7 +295,9 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     child: Row(
                       children: [
                         UserAvatar(
@@ -228,22 +312,31 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
                             children: [
                               Row(
                                 children: [
-                                  Text(user?.username ?? 'unknown',
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13)),
+                                  Text(
+                                    user?.username ?? 'unknown',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                   if (user?.isVerified == true) ...[
                                     const SizedBox(width: 3),
-                                    const Icon(Icons.verified,
-                                        size: 13, color: AppColors.instagramBlue),
+                                    const Icon(
+                                      Icons.verified,
+                                      size: 13,
+                                      color: AppColors.instagramBlue,
+                                    ),
                                   ],
                                 ],
                               ),
-                              Text(Formatters.timeAgo(story.createdAt),
-                                  style: TextStyle(
-                                      color: Colors.white.withValues(alpha: .7),
-                                      fontSize: 11)),
+                              Text(
+                                Formatters.timeAgo(story.createdAt),
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: .7),
+                                  fontSize: 11,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -258,21 +351,36 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
                   if (story.caption.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 28),
+                        horizontal: 20,
+                        vertical: 28,
+                      ),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 9),
+                            horizontal: 14,
+                            vertical: 9,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: .45),
                             borderRadius: BorderRadius.circular(18),
                           ),
-                          child: Text(story.caption,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 14)),
+                          child: Text(
+                            story.caption,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ),
+                    ),
+                  if (me != null && !isMyStory)
+                    _StoryReplyBar(
+                      controller: _replyController,
+                      focusNode: _replyFocus,
+                      onEmoji: _sendReaction,
+                      onSend: _sendReply,
                     ),
                 ],
               ),
@@ -282,9 +390,35 @@ class _StoryViewerState extends ConsumerState<StoryViewer>
                 child: Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                      color: scheme.scrim.withValues(alpha: .5),
-                      shape: BoxShape.circle),
+                    color: scheme.scrim.withValues(alpha: .5),
+                    shape: BoxShape.circle,
+                  ),
                   child: const Icon(Icons.pause, color: Colors.white, size: 36),
+                ),
+              ),
+            if (_floatingReaction != null)
+              Positioned(
+                right: 26,
+                bottom: 148,
+                child: IgnorePointer(
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 700),
+                    builder: (context, value, child) => Opacity(
+                      opacity: (1 - value).clamp(0.0, 1.0),
+                      child: Transform.translate(
+                        offset: Offset(0, -36 * value),
+                        child: Transform.scale(
+                          scale: .7 + (.5 * value),
+                          child: child,
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      _floatingReaction!,
+                      style: const TextStyle(fontSize: 42),
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -311,14 +445,16 @@ class _StoryMediaState extends State<_StoryMedia> {
   void initState() {
     super.initState();
     if (widget.story.isVideo) {
-      _video = VideoPlayerController.networkUrl(
-          Uri.parse(widget.story.mediaUrl))
-        ..initialize().then((_) {
-          if (!mounted) return;
-          setState(() {});
-          _video?.setLooping(true);
-          if (widget.active) _video?.play();
-        }).catchError((_) {});
+      _video =
+          VideoPlayerController.networkUrl(Uri.parse(widget.story.mediaUrl))
+            ..initialize()
+                .then((_) {
+                  if (!mounted) return;
+                  setState(() {});
+                  _video?.setLooping(true);
+                  if (widget.active) _video?.play();
+                })
+                .catchError((_) {});
     }
   }
 
@@ -349,9 +485,10 @@ class _StoryMediaState extends State<_StoryMedia> {
           child: FittedBox(
             fit: BoxFit.cover,
             child: SizedBox(
-                width: video.value.size.width,
-                height: video.value.size.height,
-                child: VideoPlayer(video)),
+              width: video.value.size.width,
+              height: video.value.size.height,
+              child: VideoPlayer(video),
+            ),
           ),
         );
       }
@@ -371,6 +508,93 @@ class _StoryMediaState extends State<_StoryMedia> {
         url: widget.story.mediaUrl,
         fit: BoxFit.cover,
         errorWidget: Container(color: Colors.black87),
+      ),
+    );
+  }
+}
+
+class _StoryReplyBar extends StatelessWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onEmoji;
+  final VoidCallback onSend;
+
+  const _StoryReplyBar({
+    required this.controller,
+    required this.focusNode,
+    required this.onEmoji,
+    required this.onSend,
+  });
+
+  static const _emojis = ['❤️', '😂', '😮', '😢', '👏', '🔥'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _emojis.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final emoji = _emojis[index];
+                return GestureDetector(
+                  onTap: () => onEmoji(emoji),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(emoji, style: const TextStyle(fontSize: 21)),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  textInputAction: TextInputAction.send,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Send message',
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: .6),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: .12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(22),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onSubmitted: (_) => onSend(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: onSend,
+                icon: const Icon(Icons.send, color: Colors.white),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

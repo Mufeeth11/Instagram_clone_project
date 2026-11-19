@@ -9,6 +9,13 @@ import '../../models/user_model.dart';
 class AppDummyData {
   static const String currentUserId = 'u0';
 
+  // Precomputed demo hashes. The demo passwords are public, so fixed salts are
+  // acceptable here. Real sign-ups use a new random salt via PasswordHasher.
+  static const String demoPasswordHash =
+      r'pbkdf2-sha256$100000$RGVtb0RlbW9TYWx0MTIzNDU2$vOJcDX8FpLr4cJkr5MuKeiMsIrFk1lEcaWkTi+odj4s=';
+  static const String seedPasswordHash =
+      r'pbkdf2-sha256$100000$U2VlZFNhbHRBYmMxMjM0NTY3OA==$ze7yGTJheF2QpZ7Wz6BPzs0CY5+XjmH487rR/W7tY3M=';
+
   static String img(String seed, {int size = 900}) =>
       'https://picsum.photos/seed/$seed/$size/$size';
 
@@ -60,31 +67,136 @@ class AppDummyData {
   ];
 
   static const List<_SeedUser> _userSeeds = [
-    _SeedUser('demo_user', 'Demo User', 'Exploring the world, one frame at a time ✨', true),
-    _SeedUser('anushka.ray', 'Anushka Ray', 'Photographer | Storyteller | Coffee ☕', true),
-    _SeedUser('kavindu_dev', 'Kavindu Perera', 'Flutter developer & design enthusiast', false),
-    _SeedUser('maya.studio', 'Maya Studio', 'Art, fashion & everything in between', true),
-    _SeedUser('nimal.travels', 'Nimal Travels', 'Wanderlust | Sri Lanka 🇱🇰', false),
-    _SeedUser('sara.waves', 'Sara Fernando', 'Ocean lover 🌊 | Surf | Sunsets', false),
+    _SeedUser(
+      'demo_user',
+      'Demo User',
+      'Exploring the world, one frame at a time ✨',
+      true,
+    ),
+    _SeedUser(
+      'anushka.ray',
+      'Anushka Ray',
+      'Photographer | Storyteller | Coffee ☕',
+      true,
+    ),
+    _SeedUser(
+      'kavindu_dev',
+      'Kavindu Perera',
+      'Flutter developer & design enthusiast',
+      false,
+    ),
+    _SeedUser(
+      'maya.studio',
+      'Maya Studio',
+      'Art, fashion & everything in between',
+      true,
+    ),
+    _SeedUser(
+      'nimal.travels',
+      'Nimal Travels',
+      'Wanderlust | Sri Lanka 🇱🇰',
+      false,
+    ),
+    _SeedUser(
+      'sara.waves',
+      'Sara Fernando',
+      'Ocean lover 🌊 | Surf | Sunsets',
+      false,
+    ),
     _SeedUser('thefooddiary', 'The Food Diary', 'Eat. Cook. Repeat. 🍜', true),
-    _SeedUser('arjun.clicks', 'Arjun Clicks', 'Street photography & night lights', false),
-    _SeedUser('lini.designs', 'Lini Designs', 'UI/UX designer • minimal everything', false),
+    _SeedUser(
+      'arjun.clicks',
+      'Arjun Clicks',
+      'Street photography & night lights',
+      false,
+    ),
+    _SeedUser(
+      'lini.designs',
+      'Lini Designs',
+      'UI/UX designer • minimal everything',
+      false,
+    ),
     _SeedUser('chamila.fit', 'Chamila Fitness', 'Stronger every day 💪', false),
-    _SeedUser('raj.music', 'Raj Music', 'Producer | Piano | Late night sessions 🎹', true),
+    _SeedUser(
+      'raj.music',
+      'Raj Music',
+      'Producer | Piano | Late night sessions 🎹',
+      true,
+    ),
     _SeedUser('dilu.paints', 'Dilu Paints', 'Colour is life 🎨', false),
-    _SeedUser('wild.lanka', 'Wild Lanka', 'Wildlife & nature photography', true),
-    _SeedUser('ishara.reads', 'Ishara Reads', 'Books, tea and quiet mornings 📚', false),
-    _SeedUser('noah.skates', 'Noah Skates', 'Skateboarding & city culture', false),
-    _SeedUser('aisha.style', 'Aisha Style', 'Style inspiration | Outfit diary', true),
-    _SeedUser('saman.builds', 'Saman Builds', 'Architecture & interiors', false),
-    _SeedUser('nethmi.bakes', 'Nethmi Bakes', 'Home baker 🧁 | Recipes & treats', false),
-    _SeedUser('yoga.with.me', 'Yoga With Me', 'Mindful movement & calm living 🧘', false),
-    _SeedUser('mike.motion', 'Mike Motion', 'Motion designer | 3D & animation', true),
-    _SeedUser('travelwith.ami', 'Travel With Ami', 'Passport stamps & mountain air', false),
-    _SeedUser('kids.of.sun', 'Kids Of Sun', 'Little moments, big love ☀️', false),
+    _SeedUser(
+      'wild.lanka',
+      'Wild Lanka',
+      'Wildlife & nature photography',
+      true,
+    ),
+    _SeedUser(
+      'ishara.reads',
+      'Ishara Reads',
+      'Books, tea and quiet mornings 📚',
+      false,
+    ),
+    _SeedUser(
+      'noah.skates',
+      'Noah Skates',
+      'Skateboarding & city culture',
+      false,
+    ),
+    _SeedUser(
+      'aisha.style',
+      'Aisha Style',
+      'Style inspiration | Outfit diary',
+      true,
+    ),
+    _SeedUser(
+      'saman.builds',
+      'Saman Builds',
+      'Architecture & interiors',
+      false,
+    ),
+    _SeedUser(
+      'nethmi.bakes',
+      'Nethmi Bakes',
+      'Home baker 🧁 | Recipes & treats',
+      false,
+    ),
+    _SeedUser(
+      'yoga.with.me',
+      'Yoga With Me',
+      'Mindful movement & calm living 🧘',
+      false,
+    ),
+    _SeedUser(
+      'mike.motion',
+      'Mike Motion',
+      'Motion designer | 3D & animation',
+      true,
+    ),
+    _SeedUser(
+      'travelwith.ami',
+      'Travel With Ami',
+      'Passport stamps & mountain air',
+      false,
+    ),
+    _SeedUser(
+      'kids.of.sun',
+      'Kids Of Sun',
+      'Little moments, big love ☀️',
+      false,
+    ),
     _SeedUser('dennis.tech', 'Dennis Tech', 'Gadgets, code & coffee', false),
-    _SeedUser('ruth.plants', 'Ruth Plants', 'Plant parent | Urban jungle 🌿', false),
-    _SeedUser('offical.ig', 'Instagram Inspired', 'A local demo community', true),
+    _SeedUser(
+      'ruth.plants',
+      'Ruth Plants',
+      'Plant parent | Urban jungle 🌿',
+      false,
+    ),
+    _SeedUser(
+      'offical.ig',
+      'Instagram Inspired',
+      'A local demo community',
+      true,
+    ),
   ];
 
   static List<UserModel> buildUsers() {
@@ -102,20 +214,26 @@ class AppDummyData {
         following.addAll(['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7', 'u8']);
         followers.addAll(['u1', 'u2', 'u3', 'u5', 'u8', 'u11', 'u15', 'u20']);
       }
-      users.add(UserModel(
-        id: 'u$i',
-        username: seed.username,
-        displayName: seed.displayName,
-        bio: seed.bio,
-        website: i % 3 == 0 ? 'https://${seed.username.replaceAll('.', '')}.com' : '',
-        profileImage: img('avatar$i', size: 300),
-        isVerified: seed.verified,
-        isPrivate: i == 14 || i == 19,
-        followers: followers.toSet().toList(),
-        following: following.toSet().toList(),
-        email: i == 0 ? 'demo@instagram.local' : '${seed.username.replaceAll('.', '')}@mail.com',
-        password: i == 0 ? 'demo123' : 'pass123',
-      ));
+      users.add(
+        UserModel(
+          id: 'u$i',
+          username: seed.username,
+          displayName: seed.displayName,
+          bio: seed.bio,
+          website: i % 3 == 0
+              ? 'https://${seed.username.replaceAll('.', '')}.com'
+              : '',
+          profileImage: img('avatar$i', size: 300),
+          isVerified: seed.verified,
+          isPrivate: i == 14 || i == 19,
+          followers: followers.toSet().toList(),
+          following: following.toSet().toList(),
+          email: i == 0
+              ? 'demo@instagram.local'
+              : '${seed.username.replaceAll('.', '')}@mail.com',
+          passwordHash: i == 0 ? demoPasswordHash : seedPasswordHash,
+        ),
+      );
     }
     return users;
   }
@@ -151,20 +269,20 @@ class AppDummyData {
         for (var k = 0; k < imageCount; k++) img('post${i}_$k'),
       ];
       final caption = _captions[i % _captions.length];
-      posts.add(PostModel(
-        id: 'p$i',
-        userId: 'u$author',
-        caption: i == 0
-            ? '$caption #instagram #clone'
-            : caption,
-        imageUrls: urls,
-        location: i % 4 == 0 ? locations[i % locations.length] : '',
-        createdAt: now.subtract(Duration(hours: i * 5 + 2)),
-        likeCount: 120 + ((i * 937) % 18400),
-        taggedUserIds: i % 6 == 0
-            ? ['u${(i + 2) % 25}', 'u${(i + 9) % 25}']
-            : (i % 3 == 0 ? ['u${(i + 4) % 25}'] : const []),
-      ));
+      posts.add(
+        PostModel(
+          id: 'p$i',
+          userId: 'u$author',
+          caption: i == 0 ? '$caption #instagram #clone' : caption,
+          imageUrls: urls,
+          location: i % 4 == 0 ? locations[i % locations.length] : '',
+          createdAt: now.subtract(Duration(hours: i * 5 + 2)),
+          likeCount: 120 + ((i * 937) % 18400),
+          taggedUserIds: i % 6 == 0
+              ? ['u${(i + 2) % 25}', 'u${(i + 9) % 25}']
+              : (i % 3 == 0 ? ['u${(i + 4) % 25}'] : const []),
+        ),
+      );
     }
     return posts;
   }
@@ -191,17 +309,19 @@ class AppDummyData {
       'Just vibes and good music 🎧 #vibes',
     ];
     for (var i = 0; i < 16; i++) {
-      reels.add(ReelModel(
-        id: 'r$i',
-        userId: 'u${(i * 3 + 2) % 25}',
-        videoUrl: videoUrls[i % videoUrls.length],
-        thumbnailUrl: img('reel$i', size: 800),
-        caption: captions[i],
-        audioName: audioNames[i % audioNames.length],
-        likeCount: 800 + ((i * 2137) % 92000),
-        shareCount: 20 + i * 13,
-        createdAt: now.subtract(Duration(days: i)),
-      ));
+      reels.add(
+        ReelModel(
+          id: 'r$i',
+          userId: 'u${(i * 3 + 2) % 25}',
+          videoUrl: videoUrls[i % videoUrls.length],
+          thumbnailUrl: img('reel$i', size: 800),
+          caption: captions[i],
+          audioName: audioNames[i % audioNames.length],
+          likeCount: 800 + ((i * 2137) % 92000),
+          shareCount: 20 + i * 13,
+          createdAt: now.subtract(Duration(days: i)),
+        ),
+      );
     }
     return reels;
   }
@@ -210,55 +330,111 @@ class AppDummyData {
     final stories = <StoryModel>[];
     final now = DateTime.now();
     final captions = [
-      'Morning coffee ☕', 'On my way ✈️', 'New drop 🔥', 'Studio time 🎨',
-      'Sunset 🌅', 'Weekend vibes', 'Beach day 🌊', 'Late night thoughts',
-      'Just because ✨', 'Behind the scenes', 'Good news! 🎉', 'Take a guess 👀',
-      'Freshly baked 🧁', 'Training day 💪', 'Hello from Tokyo 🗼',
-      'Today\'s palette 🎨', 'A little update', 'See you soon 👋',
+      'Morning coffee ☕',
+      'On my way ✈️',
+      'New drop 🔥',
+      'Studio time 🎨',
+      'Sunset 🌅',
+      'Weekend vibes',
+      'Beach day 🌊',
+      'Late night thoughts',
+      'Just because ✨',
+      'Behind the scenes',
+      'Good news! 🎉',
+      'Take a guess 👀',
+      'Freshly baked 🧁',
+      'Training day 💪',
+      'Hello from Tokyo 🗼',
+      'Today\'s palette 🎨',
+      'A little update',
+      'See you soon 👋',
     ];
     for (var i = 0; i < 18; i++) {
-      stories.add(StoryModel(
-        id: 's$i',
-        userId: 'u${i % 25}',
-        mediaUrl: i % 6 == 4 ? videoUrls[i % videoUrls.length] : img('story$i', size: 800),
-        isVideo: i % 6 == 4,
-        caption: captions[i],
-        createdAt: now.subtract(Duration(minutes: i * 37)),
-      ));
+      stories.add(
+        StoryModel(
+          id: 's$i',
+          userId: 'u${i % 25}',
+          mediaUrl: i % 6 == 4
+              ? videoUrls[i % videoUrls.length]
+              : img('story$i', size: 800),
+          isVideo: i % 6 == 4,
+          caption: captions[i],
+          createdAt: now.subtract(Duration(minutes: i * 37)),
+        ),
+      );
     }
     return stories;
   }
 
   static List<CommentModel> buildComments() {
     final texts = [
-      'This is absolutely stunning! 😍', 'Love the colours here 🔥',
-      'Where was this taken? 📍', 'Amazing work as always 👏',
-      'Needed this today, thank you ✨', 'Okay this is goals 😭',
-      'The composition is perfect 📷', 'Can you share the preset?',
-      'So happy for you! 🎉', 'This made me smile ☺️',
-      'Adding this to my inspiration board', 'Incredible detail 👌',
-      'Come visit me in Colombo 🇱🇰', 'More of this please! 🙏',
-      'The vibes are immaculate 🌊', 'How did you edit this?',
-      'Simply beautiful ❤️', 'Saving this for later 🔖',
-      'Your best post yet!', 'This is pure magic ✨',
-      'That light though ☀️', 'So creative! 💡',
-      'I agree completely', 'Check out my latest post too!',
-      'This is exactly what I needed to see 👀', 'Woah 🤩',
-      'Classy as always', 'Love the energy here 💃',
-      'Perfect timing for this post', 'Following you from today ✅',
+      'This is absolutely stunning! 😍',
+      'Love the colours here 🔥',
+      'Where was this taken? 📍',
+      'Amazing work as always 👏',
+      'Needed this today, thank you ✨',
+      'Okay this is goals 😭',
+      'The composition is perfect 📷',
+      'Can you share the preset?',
+      'So happy for you! 🎉',
+      'This made me smile ☺️',
+      'Adding this to my inspiration board',
+      'Incredible detail 👌',
+      'Come visit me in Colombo 🇱🇰',
+      'More of this please! 🙏',
+      'The vibes are immaculate 🌊',
+      'How did you edit this?',
+      'Simply beautiful ❤️',
+      'Saving this for later 🔖',
+      'Your best post yet!',
+      'This is pure magic ✨',
+      'That light though ☀️',
+      'So creative! 💡',
+      'I agree completely',
+      'Check out my latest post too!',
+      'This is exactly what I needed to see 👀',
+      'Woah 🤩',
+      'Classy as always',
+      'Love the energy here 💃',
+      'Perfect timing for this post',
+      'Following you from today ✅',
     ];
     final comments = <CommentModel>[];
     final now = DateTime.now();
     for (var i = 0; i < 30; i++) {
-      comments.add(CommentModel(
-        id: 'c$i',
-        targetId: i < 21 ? 'p${i % 8}' : 'r${i % 6}',
-        targetType: i < 21 ? 'post' : 'reel',
-        userId: 'u${(i * 4 + 1) % 25}',
-        text: texts[i],
-        createdAt: now.subtract(Duration(minutes: i * 19 + 5)),
-        likeCount: i * 3,
-      ));
+      comments.add(
+        CommentModel(
+          id: 'c$i',
+          targetId: i < 21 ? 'p${i % 8}' : 'r${i % 6}',
+          targetType: i < 21 ? 'post' : 'reel',
+          userId: 'u${(i * 4 + 1) % 25}',
+          text: texts[i],
+          createdAt: now.subtract(Duration(minutes: i * 19 + 5)),
+          likeCount: i * 3,
+        ),
+      );
+    }
+    final replies = <(String, String, String)>[
+      ('c0', 'u2', 'Thank you so much! 😊'),
+      ('c0', 'u7', 'Agreed, this is beautiful.'),
+      ('c1', 'u4', 'The colours are unreal 🔥'),
+      ('c3', 'u9', 'Following for more like this!'),
+    ];
+    for (var i = 0; i < replies.length; i++) {
+      final (parentId, userId, text) = replies[i];
+      final parent = comments.firstWhere((c) => c.id == parentId);
+      comments.add(
+        CommentModel(
+          id: 'c_reply_$i',
+          targetId: parent.targetId,
+          targetType: parent.targetType,
+          userId: userId,
+          text: text,
+          createdAt: now.subtract(Duration(minutes: i * 3 + 1)),
+          likeCount: i + 1,
+          parentId: parentId,
+        ),
+      );
     }
     return comments;
   }

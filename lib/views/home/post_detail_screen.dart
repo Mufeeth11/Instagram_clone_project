@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/utils/formatters.dart';
+import '../widgets/comment_sheet.dart';
+import '../widgets/comment_tile.dart';
 import '../widgets/post_card.dart';
-import '../widgets/user_avatar.dart';
 import '../../controllers/feed_controller.dart';
 
 class PostDetailScreen extends ConsumerWidget {
@@ -22,7 +22,7 @@ class PostDetailScreen extends ConsumerWidget {
         body: const Center(child: Text('This post is no longer available.')),
       );
     }
-    final comments = state.commentsFor(postId);
+    final comments = buildCommentThread(state, postId);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Post'),
@@ -47,26 +47,22 @@ class PostDetailScreen extends ConsumerWidget {
               padding: EdgeInsets.all(32),
               child: Center(child: Text('Be the first to comment.')),
             ),
-          ...comments.map((comment) {
-            final user = state.userById(comment.userId);
-            return ListTile(
-              leading: UserAvatar(
-                  imageUrl: user?.profileImage ?? '', size: 38, viewed: true),
-              title: Row(
-                children: [
-                  Text(user?.username ?? 'unknown',
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700)),
-                  const SizedBox(width: 8),
-                  Text(Formatters.timeAgo(comment.createdAt),
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                ],
+          ...comments.map(
+            (entry) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: CommentTile(
+                comment: entry.comment,
+                isReply: entry.isReply,
+                replyToUsername: entry.replyToUsername,
+                onReply: () => showCommentSheet(
+                  context,
+                  targetId: postId,
+                  targetType: 'post',
+                  replyTo: entry.comment,
+                ),
               ),
-              subtitle: Text(comment.text),
-            );
-          }),
+            ),
+          ),
           const SizedBox(height: 40),
         ],
       ),

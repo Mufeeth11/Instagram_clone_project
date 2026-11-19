@@ -1,3 +1,5 @@
+import '../core/services/password_hasher.dart';
+
 class UserModel {
   final String id;
   final String username;
@@ -10,7 +12,10 @@ class UserModel {
   final List<String> followers;
   final List<String> following;
   final String email;
-  final String password;
+
+  /// Encoded salted hash, never a plain password.
+  /// Format: pbkdf2-sha256$iterations$base64Salt$base64Hash
+  final String passwordHash;
 
   const UserModel({
     required this.id,
@@ -24,8 +29,10 @@ class UserModel {
     this.followers = const [],
     this.following = const [],
     this.email = '',
-    this.password = '',
+    this.passwordHash = '',
   });
+
+  bool get hasPasswordHash => passwordHash.isNotEmpty;
 
   UserModel copyWith({
     String? username,
@@ -38,7 +45,7 @@ class UserModel {
     List<String>? followers,
     List<String>? following,
     String? email,
-    String? password,
+    String? passwordHash,
   }) {
     return UserModel(
       id: id,
@@ -52,7 +59,7 @@ class UserModel {
       followers: followers ?? this.followers,
       following: following ?? this.following,
       email: email ?? this.email,
-      password: password ?? this.password,
+      passwordHash: passwordHash ?? this.passwordHash,
     );
   }
 
@@ -68,7 +75,7 @@ class UserModel {
         'followers': followers,
         'following': following,
         'email': email,
-        'password': password,
+        'passwordHash': passwordHash,
       };
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
@@ -83,6 +90,18 @@ class UserModel {
         followers: List<String>.from(json['followers'] as List? ?? const []),
         following: List<String>.from(json['following'] as List? ?? const []),
         email: json['email'] as String? ?? '',
-        password: json['password'] as String? ?? '',
+        passwordHash: _readPasswordHash(json),
       );
+
+  static String _readPasswordHash(Map<String, dynamic> json) {
+    final stored = json['passwordHash'] as String?;
+    if (stored != null && stored.isNotEmpty) return stored;
+
+    // One-time safety net for older local saves that still contain plaintext.
+    final legacy = json['password'] as String?;
+    if (legacy != null && legacy.isNotEmpty) {
+      return PasswordHasher.hashPassword(legacy);
+    }
+    return '';
+  }
 }

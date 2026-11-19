@@ -52,9 +52,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(title,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700)),
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
             Expanded(
               child: ListView.builder(
@@ -64,19 +68,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   if (user == null) return const SizedBox.shrink();
                   return ListTile(
                     leading: UserAvatar(
-                        imageUrl: user.profileImage, size: 44, viewed: true),
-                    title: Text(user.username,
-                        style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w700)),
+                      imageUrl: user.profileImage,
+                      size: 44,
+                      viewed: true,
+                    ),
+                    title: Text(
+                      user.username,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     subtitle: Text(user.displayName),
                     trailing: state.currentUserId != user.id
                         ? TextButton(
                             onPressed: () => ref
                                 .read(profileControllerProvider)
                                 .toggleFollow(user.id),
-                            child: Text(state.isFollowing(user.id)
-                                ? 'Following'
-                                : 'Follow'),
+                            child: Text(
+                              state.isFollowing(user.id)
+                                  ? 'Following'
+                                  : 'Follow',
+                            ),
                           )
                         : null,
                     onTap: () {
@@ -94,9 +107,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   }
 
   void _openReels(List<ReelModel> reels, int index) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => _ReelPreview(reels: reels, initialIndex: index),
-    ));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _ReelPreview(reels: reels, initialIndex: index),
+      ),
+    );
   }
 
   @override
@@ -112,14 +127,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       return Scaffold(
         appBar: AppBar(title: const Text('Profile')),
         body: const EmptyState(
-            icon: Icons.person_off, title: 'Profile not found'),
+          icon: Icons.person_off,
+          title: 'Profile not found',
+        ),
       );
     }
 
     final posts = state.posts.where((p) => p.userId == user.id).toList();
     final reels = state.reels.where((r) => r.userId == user.id).toList();
-    final tagged =
-        state.posts.where((p) => p.taggedUserIds.contains(user.id)).toList();
+    final tagged = state.posts
+        .where((p) => p.taggedUserIds.contains(user.id))
+        .toList();
     final saved = isMe
         ? state.posts.where((p) => state.savedPosts.contains(p.id)).toList()
         : <PostModel>[];
@@ -135,8 +153,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 onPressed: () => context.pop(),
               )
             : null,
-        title: Text(user.username,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        title: Text(
+          user.username,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
         actions: [
           if (isMe)
             IconButton(
@@ -150,16 +170,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   ref
                       .read(profileControllerProvider)
                       .toggleBlockedUser(user.id);
-                  FeedbackUtils.snack(context,
-                      '${state.blockedUsers.contains(user.id) ? 'Unblocked' : 'Blocked'} @${user.username}');
+                  FeedbackUtils.snack(
+                    context,
+                    '${state.blockedUsers.contains(user.id) ? 'Unblocked' : 'Blocked'} @${user.username}',
+                  );
                 }
               },
               itemBuilder: (context) => [
                 PopupMenuItem(
                   value: 'block',
-                  child: Text(state.blockedUsers.contains(user.id)
-                      ? 'Unblock'
-                      : 'Block'),
+                  child: Text(
+                    state.blockedUsers.contains(user.id) ? 'Unblock' : 'Block',
+                  ),
                 ),
               ],
             ),
@@ -221,13 +243,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               children: [
                 Row(
                   children: [
-                    Text(user.displayName,
-                        style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w700)),
+                    Text(
+                      user.displayName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(width: 5),
                     if (user.isVerified)
-                      const Icon(Icons.verified,
-                          size: 14, color: AppColors.instagramBlue),
+                      const Icon(
+                        Icons.verified,
+                        size: 14,
+                        color: AppColors.instagramBlue,
+                      ),
                   ],
                 ),
                 if (user.bio.isNotEmpty) ...[
@@ -236,9 +265,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 ],
                 if (user.website.isNotEmpty) ...[
                   const SizedBox(height: 3),
-                  Text(user.website,
-                      style: const TextStyle(
-                          color: AppColors.instagramBlue, fontSize: 12)),
+                  Text(
+                    user.website,
+                    style: const TextStyle(
+                      color: AppColors.instagramBlue,
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 12),
                 Row(
@@ -255,12 +288,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                     .read(profileControllerProvider)
                                     .toggleFollow(user.id);
                                 FeedbackUtils.snack(
-                                    context,
-                                    '${state.isFollowing(user.id) ? 'Unfollowed' : 'Following'} @${user.username}');
+                                  context,
+                                  '${state.isFollowing(user.id) ? 'Unfollowed' : 'Following'} @${user.username}',
+                                );
                               },
-                              child: Text(state.isFollowing(user.id)
-                                  ? 'Following'
-                                  : 'Follow'),
+                              child: Text(
+                                state.isFollowing(user.id)
+                                    ? 'Following'
+                                    : 'Follow',
+                              ),
                             ),
                     ),
                     const SizedBox(width: 8),
@@ -289,14 +325,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 ),
                 reels.isEmpty
                     ? const EmptyState(
-                        icon: Icons.movie_outlined, title: 'No reels yet')
+                        icon: Icons.movie_outlined,
+                        title: 'No reels yet',
+                      )
                     : GridView.builder(
                         padding: const EdgeInsets.all(2),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 2,
-                                mainAxisSpacing: 2),
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 2,
+                              mainAxisSpacing: 2,
+                            ),
                         itemCount: reels.length,
                         itemBuilder: (context, index) => GestureDetector(
                           onTap: () => _openReels(reels, index),
@@ -307,8 +346,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                               const Positioned(
                                 top: 8,
                                 right: 8,
-                                child: Icon(Icons.movie,
-                                    size: 17, color: Colors.white),
+                                child: Icon(
+                                  Icons.movie,
+                                  size: 17,
+                                  color: Colors.white,
+                                ),
                               ),
                             ],
                           ),
@@ -332,7 +374,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     : const EmptyState(
                         icon: Icons.lock_outline,
                         title: 'Saved posts are private',
-                        message: 'Only you can see your saved collection.'),
+                        message: 'Only you can see your saved collection.',
+                      ),
               ],
             ),
           ),
@@ -351,20 +394,24 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Column(
-          children: [
-            Text('$value',
-                style: const TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          ],
+    onTap: onTap,
+    child: Column(
+      children: [
+        Text(
+          '$value',
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
         ),
-      );
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _PostGrid extends StatelessWidget {
@@ -386,7 +433,10 @@ class _PostGrid extends StatelessWidget {
     return GridView.builder(
       padding: const EdgeInsets.all(2),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3, crossAxisSpacing: 2, mainAxisSpacing: 2),
+        crossAxisCount: 3,
+        crossAxisSpacing: 2,
+        mainAxisSpacing: 2,
+      ),
       itemCount: posts.length,
       itemBuilder: (context, index) {
         final post = posts[index];
@@ -400,8 +450,11 @@ class _PostGrid extends StatelessWidget {
                 const Positioned(
                   top: 8,
                   right: 8,
-                  child: Icon(Icons.auto_stories,
-                      size: 17, color: Colors.white),
+                  child: Icon(
+                    Icons.auto_stories,
+                    size: 17,
+                    color: Colors.white,
+                  ),
                 ),
             ],
           ),
@@ -432,12 +485,18 @@ class _SavedGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     if (posts.isEmpty && reels.isEmpty) {
       return EmptyState(
-          icon: Icons.bookmark_border, title: emptyTitle, message: message);
+        icon: Icons.bookmark_border,
+        title: emptyTitle,
+        message: message,
+      );
     }
     return GridView.builder(
       padding: const EdgeInsets.all(2),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3, crossAxisSpacing: 2, mainAxisSpacing: 2),
+        crossAxisCount: 3,
+        crossAxisSpacing: 2,
+        mainAxisSpacing: 2,
+      ),
       itemCount: posts.length + reels.length,
       itemBuilder: (context, index) {
         if (index >= posts.length) {
@@ -469,8 +528,11 @@ class _SavedGrid extends StatelessWidget {
                 const Positioned(
                   top: 8,
                   right: 8,
-                  child: Icon(Icons.auto_stories,
-                      size: 17, color: Colors.white),
+                  child: Icon(
+                    Icons.auto_stories,
+                    size: 17,
+                    color: Colors.white,
+                  ),
                 ),
             ],
           ),
@@ -479,6 +541,7 @@ class _SavedGrid extends StatelessWidget {
     );
   }
 }
+
 class _ReelPreview extends ConsumerStatefulWidget {
   final List<ReelModel> reels;
   final int initialIndex;
@@ -513,6 +576,9 @@ class _ReelPreviewState extends ConsumerState<_ReelPreview> {
               reel: widget.reels[index],
               active: index == _index,
               muted: _muted,
+              preloadUrl: index + 1 < widget.reels.length
+                  ? widget.reels[index + 1].videoUrl
+                  : null,
               onToggleMute: () => setState(() => _muted = !_muted),
             ),
           ),

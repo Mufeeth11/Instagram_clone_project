@@ -2,31 +2,39 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/feedback.dart';
-import '../../core/utils/formatters.dart';
 import '../../controllers/feed_controller.dart';
+import '../../models/comment_model.dart';
 import 'app_image.dart';
+import 'comment_tile.dart';
 
 Future<void> showCommentSheet(
   BuildContext context, {
   required String targetId,
   required String targetType,
+  CommentModel? replyTo,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => CommentSheet(targetId: targetId, targetType: targetType),
+    builder: (_) => CommentSheet(
+      targetId: targetId,
+      targetType: targetType,
+      replyTo: replyTo,
+    ),
   );
 }
 
 class CommentSheet extends ConsumerStatefulWidget {
   final String targetId;
   final String targetType;
+  final CommentModel? replyTo;
 
   const CommentSheet({
     super.key,
     required this.targetId,
     required this.targetType,
+    this.replyTo,
   });
 
   @override
@@ -35,32 +43,64 @@ class CommentSheet extends ConsumerStatefulWidget {
 
 class _CommentSheetState extends ConsumerState<CommentSheet> {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
+  CommentModel? _replyTo;
+
+  @override
+  void initState() {
+    super.initState();
+    _replyTo = widget.replyTo;
+    if (_replyTo != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.requestFocus();
+      });
+    }
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   void _submit() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    ref.read(feedControllerProvider).addComment(
+    final state = ref.read(feedControllerProvider).state;
+    final replyTo = _replyTo != null && state.commentById(_replyTo!.id) != null
+        ? _replyTo
+        : null;
+    ref
+        .read(feedControllerProvider)
+        .addComment(
           targetId: widget.targetId,
           targetType: widget.targetType,
           text: text,
+          parentId: replyTo?.id,
         );
     _controller.clear();
+    if (mounted) setState(() => _replyTo = null);
     FeedbackUtils.tap();
-    FocusScope.of(context).unfocus();
+    _focusNode.unfocus();
+  }
+
+  void _startReply(CommentModel comment) {
+    setState(() => _replyTo = comment);
+    _focusNode.requestFocus();
+    FeedbackUtils.tap();
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(feedControllerProvider).state;
-    final comments = state.commentsFor(widget.targetId);
+    final entries = buildCommentThread(state, widget.targetId);
+    final commentCount = state.commentCountFor(widget.targetId);
     final scheme = Theme.of(context).colorScheme;
     final me = state.currentUser;
+    final replyUser = _replyTo == null
+        ? null
+        : state.userById(_replyTo!.userId);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -86,92 +126,64 @@ class _CommentSheetState extends ConsumerState<CommentSheet> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                '${comments.length} comments',
-                style:
-                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                '$commentCount comments',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
               ),
             ),
             const Divider(height: 1),
             Expanded(
-              child: comments.isEmpty
+              child: entries.isEmpty
                   ? const Center(
-                      child: Text('No comments yet. Start the conversation!'))
+                      child: Text('No comments yet. Start the conversation!'),
+                    )
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      itemCount: comments.length,
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      itemCount: entries.length,
                       itemBuilder: (context, index) {
-                        final comment = comments[index];
-                        final user = state.userById(comment.userId);
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ClipOval(
-                                child: AppImage(
-                                  url: user?.profileImage ?? '',
-                                  width: 34,
-                                  height: 34,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            user?.username ?? 'unknown',
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13),
-                                          ),
-                                        ),
-                                        Text(
-                                          Formatters.timeAgo(comment.createdAt),
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              color: scheme.onSurfaceVariant),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(comment.text,
-                                        style: const TextStyle(fontSize: 13)),
-                                    if (comment.likeCount > 0) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${comment.likeCount} likes',
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            color: scheme.onSurfaceVariant),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              if (me?.id == comment.userId)
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline,
-                                      size: 18),
-                                  onPressed: () {
-                                    ref
-                                        .read(feedControllerProvider)
-                                        .deleteComment(comment.id);
-                                    FeedbackUtils.snack(
-                                        context, 'Comment deleted');
-                                  },
-                                ),
-                            ],
-                          ),
+                        final entry = entries[index];
+                        return CommentTile(
+                          comment: entry.comment,
+                          isReply: entry.isReply,
+                          replyToUsername: entry.replyToUsername,
+                          onReply: () => _startReply(entry.comment),
+                          onDeleted: () {
+                            if (_replyTo?.id == entry.comment.id) {
+                              setState(() => _replyTo = null);
+                            }
+                          },
                         );
                       },
                     ),
             ),
             const Divider(height: 1),
+            if (_replyTo != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Replying to @${replyUser?.username ?? 'unknown'}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => setState(() => _replyTo = null),
+                      icon: const Icon(Icons.close, size: 18),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
@@ -179,14 +191,21 @@ class _CommentSheetState extends ConsumerState<CommentSheet> {
                   if (me != null)
                     ClipOval(
                       child: AppImage(
-                          url: me.profileImage, width: 32, height: 32),
+                        url: me.profileImage,
+                        width: 32,
+                        height: 32,
+                      ),
                     ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
                       controller: _controller,
-                      decoration: const InputDecoration(
-                        hintText: 'Add a comment...',
+                      focusNode: _focusNode,
+                      textInputAction: TextInputAction.send,
+                      decoration: InputDecoration(
+                        hintText: _replyTo == null
+                            ? 'Add a comment...'
+                            : 'Reply to @${replyUser?.username ?? 'unknown'}...',
                         filled: false,
                         contentPadding: EdgeInsets.zero,
                         border: InputBorder.none,
@@ -196,10 +215,7 @@ class _CommentSheetState extends ConsumerState<CommentSheet> {
                       onSubmitted: (_) => _submit(),
                     ),
                   ),
-                  TextButton(
-                    onPressed: _submit,
-                    child: const Text('Post'),
-                  ),
+                  TextButton(onPressed: _submit, child: const Text('Post')),
                 ],
               ),
             ),

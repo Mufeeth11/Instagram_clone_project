@@ -33,6 +33,7 @@ class ShareSheet extends ConsumerWidget {
         .where((u) => u.id != me?.id && !state.blockedUsers.contains(u.id))
         .take(8)
         .toList();
+    final isReel = label == 'reel';
 
     return SafeArea(
       child: Padding(
@@ -52,9 +53,10 @@ class ShareSheet extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Text('Share $label',
-                style:
-                    const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            Text(
+              'Share $label',
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 14),
             SizedBox(
               height: 92,
@@ -73,19 +75,26 @@ class ShareSheet extends ConsumerWidget {
                           .where((r) => r.id == itemId)
                           .firstOrNull;
                       final title = post?.caption ?? reel?.caption ?? label;
-                      ref.read(messagesControllerProvider).sendMessage(
+                      ref
+                          .read(messagesControllerProvider)
+                          .sendMessage(
                             user.id,
                             'Shared a $label with you: $title',
                           );
                       Navigator.pop(context);
                       FeedbackUtils.snack(
-                          context, 'Shared with @${user.username}');
+                        context,
+                        'Shared with @${user.username}',
+                      );
                     },
                     child: Column(
                       children: [
                         ClipOval(
                           child: AppImage(
-                              url: user.profileImage, width: 58, height: 58),
+                            url: user.profileImage,
+                            width: 58,
+                            height: 58,
+                          ),
                         ),
                         const SizedBox(height: 6),
                         SizedBox(
@@ -111,7 +120,8 @@ class ShareSheet extends ConsumerWidget {
               label: 'Copy link',
               onTap: () async {
                 await FeedbackUtils.copy(
-                    'https://local.instagram.demo/p/$itemId');
+                  'https://local.instagram.demo/p/$itemId',
+                );
                 if (context.mounted) Navigator.pop(context);
                 if (context.mounted) {
                   FeedbackUtils.snack(context, 'Link copied to clipboard');
@@ -121,11 +131,18 @@ class ShareSheet extends ConsumerWidget {
             _shareAction(
               context,
               icon: Icons.bookmark_border,
-              label: state.savedPosts.contains(itemId)
+              label:
+                  (isReel
+                      ? state.savedReels.contains(itemId)
+                      : state.savedPosts.contains(itemId))
                   ? 'Remove from saved'
                   : 'Save locally',
               onTap: () {
-                ref.read(feedControllerProvider).toggleSavePost(itemId);
+                if (isReel) {
+                  ref.read(reelsControllerProvider).toggleSaveReel(itemId);
+                } else {
+                  ref.read(feedControllerProvider).toggleSavePost(itemId);
+                }
                 Navigator.pop(context);
                 FeedbackUtils.snack(context, 'Saved to your collection');
               },
@@ -143,16 +160,21 @@ class ShareSheet extends ConsumerWidget {
                 final reel = state.reels
                     .where((r) => r.id == itemId)
                     .firstOrNull;
-                final media = post?.imageUrls.first ??
+                final media =
+                    post?.imageUrls.first ??
                     reel?.thumbnailUrl ??
                     AppDummyData.sampleImages.first;
-                ref.read(storyControllerProvider).addStory(StoryModel(
-                  id: 's_local_${DateTime.now().microsecondsSinceEpoch}',
-                  userId: me.id,
-                  mediaUrl: media,
-                  caption: 'Shared a $label ✨',
-                  createdAt: DateTime.now(),
-                ));
+                ref
+                    .read(storyControllerProvider)
+                    .addStory(
+                      StoryModel(
+                        id: 's_local_${DateTime.now().microsecondsSinceEpoch}',
+                        userId: me.id,
+                        mediaUrl: media,
+                        caption: 'Shared a $label ✨',
+                        createdAt: DateTime.now(),
+                      ),
+                    );
                 Navigator.pop(context);
                 FeedbackUtils.snack(context, 'Added to your story');
               },
@@ -170,9 +192,7 @@ class ShareSheet extends ConsumerWidget {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: CircleAvatar(
-        child: Icon(icon, size: 20),
-      ),
+      leading: CircleAvatar(child: Icon(icon, size: 20)),
       title: Text(label),
       onTap: onTap,
     );

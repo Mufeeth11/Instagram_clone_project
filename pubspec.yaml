@@ -43,6 +43,7 @@ dependencies:
   cached_network_image: ^4.0.7
   intl: ^0.20.3
   http: ^1.6.0
+  crypto: ^3.0.8
   liquid_pull_to_refresh: ^3.0.1
   lottie: ^3.3.3
 

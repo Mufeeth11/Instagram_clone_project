@@ -21,12 +21,15 @@ class FeedController extends AppController {
     required String targetId,
     required String targetType,
     required String text,
-  }) =>
-      actions.addComment(
-        targetId: targetId,
-        targetType: targetType,
-        text: text,
-      );
+    String? parentId,
+  }) => actions.addComment(
+    targetId: targetId,
+    targetType: targetType,
+    text: text,
+    parentId: parentId,
+  );
+
+  void toggleLikeComment(String id) => actions.toggleLikeComment(id);
 
   void deleteComment(String id) => actions.deleteComment(id);
 

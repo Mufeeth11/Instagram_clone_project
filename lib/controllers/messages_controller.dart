@@ -10,6 +10,6 @@ final messagesControllerProvider = Provider<MessagesController>(
 class MessagesController extends AppController {
   const MessagesController(super.ref, super.state);
 
-  void sendMessage(String threadUserId, String text) =>
-      actions.sendMessage(threadUserId, text);
+  void sendMessage(String threadUserId, String text, {bool autoReply = true}) =>
+      actions.sendMessage(threadUserId, text, autoReply: autoReply);
 }

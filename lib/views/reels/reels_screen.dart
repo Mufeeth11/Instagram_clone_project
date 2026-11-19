@@ -15,6 +15,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/share_sheet.dart';
 import '../widgets/user_avatar.dart';
 import '../../core/services/pixabay_service.dart';
+import '../../core/services/reel_preloader.dart';
 import '../../models/reel_model.dart';
 import '../../controllers/controllers.dart';
 
@@ -91,6 +92,9 @@ class _ReelsScreenState extends ConsumerState<ReelsScreen> {
                   audioTitle: pixabay?.audioTitle,
                   active: index == _current,
                   muted: _muted,
+                  preloadUrl: index + 1 < reels.length
+                      ? _videoUrlAt(reels, pixabayVideos, index + 1)
+                      : null,
                   onToggleMute: () => setState(() => _muted = !_muted),
                 );
               },
@@ -144,6 +148,18 @@ class _ReelsScreenState extends ConsumerState<ReelsScreen> {
   }
 }
 
+String _videoUrlAt(
+  List<ReelModel> reels,
+  List<PixabayVideo> pixabayVideos,
+  int index,
+) {
+  final reel = reels[index];
+  final pixabay = pixabayVideos.isEmpty
+      ? null
+      : pixabayVideos[index % pixabayVideos.length];
+  return pixabay?.videoUrl ?? reel.videoUrl;
+}
+
 /// Keeps the app's reel identity (id, likes, comments, user) and only swaps
 /// the media URLs for a working Pixabay clip.
 ReelModel _reelWithVideo(ReelModel reel, PixabayVideo video) => ReelModel(
@@ -166,6 +182,7 @@ class ReelItem extends ConsumerStatefulWidget {
   final String? audioTitle;
   final bool active;
   final bool muted;
+  final String? preloadUrl;
   final VoidCallback onToggleMute;
 
   const ReelItem({
@@ -175,6 +192,7 @@ class ReelItem extends ConsumerStatefulWidget {
     this.audioTitle,
     required this.active,
     required this.muted,
+    this.preloadUrl,
     required this.onToggleMute,
   });
 
@@ -190,43 +208,73 @@ class _ReelItemState extends ConsumerState<ReelItem>
   bool _showHeart = false;
   bool _manuallyPaused = false;
   Timer? _tapTimer;
+  int _initToken = 0;
   late final AnimationController _heartController;
 
   @override
   void initState() {
     super.initState();
     _heartController =
-        AnimationController(
-          vsync: this,
-          duration: const Duration(seconds: 10),
-        )..addStatusListener((status) {
-          if (status == AnimationStatus.completed && mounted) {
-            setState(() => _showHeart = false);
-          }
-        });
+        AnimationController(vsync: this, duration: const Duration(seconds: 10))
+          ..addStatusListener((status) {
+            if (status == AnimationStatus.completed && mounted) {
+              setState(() => _showHeart = false);
+            }
+          });
     _initVideo();
+    if (widget.active) _preloadNext();
   }
 
   void _initVideo() {
+    final token = ++_initToken;
+    _startVideo(token);
+  }
+
+  Future<void> _startVideo(int token) async {
+    final preloaded = await ReelVideoPreloader.take(widget.reel.videoUrl);
+    if (!mounted || token != _initToken) {
+      preloaded?.dispose();
+      return;
+    }
+    if (preloaded != null) {
+      _controller = preloaded;
+      _initialized = true;
+      _configureAndPlay(preloaded);
+      setState(() {});
+      return;
+    }
+
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(widget.reel.videoUrl),
     );
     _controller = controller;
+    try {
+      await controller.initialize();
+      if (!mounted || token != _initToken || _controller != controller) {
+        return;
+      }
+      _initialized = true;
+      _configureAndPlay(controller);
+      setState(() {});
+    } catch (_) {
+      if (mounted && token == _initToken && _controller == controller) {
+        setState(() => _error = true);
+      }
+    }
+  }
+
+  void _configureAndPlay(VideoPlayerController controller) {
     controller
-        .initialize()
-        .then((_) {
-          if (!mounted || _controller != controller) return;
-          setState(() => _initialized = true);
-          controller
-            ..setLooping(true)
-            ..setVolume(widget.muted ? 0 : 1);
-          if (widget.active) controller.play();
-        })
-        .catchError((Object _) {
-          if (mounted && _controller == controller) {
-            setState(() => _error = true);
-          }
-        });
+      ..setLooping(true)
+      ..setVolume(widget.muted ? 0 : 1);
+    if (widget.active) controller.play();
+  }
+
+  void _preloadNext() {
+    final url = widget.preloadUrl;
+    if (url != null && url.isNotEmpty && url != widget.reel.videoUrl) {
+      ReelVideoPreloader.preload(url);
+    }
   }
 
   @override
@@ -255,11 +303,18 @@ class _ReelItemState extends ConsumerState<ReelItem>
     if (widget.muted != oldWidget.muted) {
       _controller?.setVolume(widget.muted ? 0 : 1);
     }
+    if (widget.active &&
+        (widget.reel.videoUrl != oldWidget.reel.videoUrl ||
+            widget.preloadUrl != oldWidget.preloadUrl ||
+            (!oldWidget.active && widget.active))) {
+      _preloadNext();
+    }
   }
 
   @override
   void dispose() {
     _tapTimer?.cancel();
+    _initToken++;
     _controller?.dispose();
     _heartController.dispose();
     super.dispose();
@@ -344,6 +399,30 @@ class _ReelItemState extends ConsumerState<ReelItem>
             ),
           ),
         ),
+        if (_initialized && _controller != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: ValueListenableBuilder<VideoPlayerValue>(
+                valueListenable: _controller!,
+                builder: (context, value, _) {
+                  final duration = value.duration.inMilliseconds;
+                  final position = value.position.inMilliseconds;
+                  final progress = duration <= 0
+                      ? 0.0
+                      : (position / duration).clamp(0.0, 1.0).toDouble();
+                  return LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 2,
+                    backgroundColor: Colors.white.withValues(alpha: .2),
+                    color: Colors.white,
+                  );
+                },
+              ),
+            ),
+          ),
         GestureDetector(
           onTap: _onTap,
           onDoubleTap: _onDoubleTap,

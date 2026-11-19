@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/services/password_hasher.dart';
 import '../core/services/storage_service.dart';
 import '../data/dummy_data/dummy_data.dart';
 import '../models/chat_message_model.dart';
@@ -37,6 +38,7 @@ class AppState {
   final Set<String> savedPosts;
   final Set<String> likedReels;
   final Set<String> savedReels;
+  final Set<String> likedComments;
   final Set<String> viewedStories;
   final Set<String> blockedUsers;
   final List<String> searchHistory;
@@ -56,6 +58,7 @@ class AppState {
     this.savedPosts = const {},
     this.likedReels = const {},
     this.savedReels = const {},
+    this.likedComments = const {},
     this.viewedStories = const {},
     this.blockedUsers = const {},
     this.searchHistory = const [],
@@ -64,25 +67,26 @@ class AppState {
   });
 
   factory AppState.initial() => AppState(
-        users: AppDummyData.buildUsers(),
-        posts: AppDummyData.buildPosts(),
-        reels: AppDummyData.buildReels(),
-        stories: AppDummyData.buildStories(),
-        comments: AppDummyData.buildComments(),
-        notifications: AppDummyData.buildNotifications(),
-        chatMessages: const [],
-        likedPosts: {'p2', 'p5'},
-        savedPosts: {'p3'},
-        likedReels: {'r1'},
-        settings: const {
-          'notifications': true,
-          'privateAccount': false,
-          'activityStatus': true,
-          'commentControls': 'Everyone',
-          'language': 'English',
-          'archive': false,
-        },
-      );
+    users: AppDummyData.buildUsers(),
+    posts: AppDummyData.buildPosts(),
+    reels: AppDummyData.buildReels(),
+    stories: AppDummyData.buildStories(),
+    comments: AppDummyData.buildComments(),
+    notifications: AppDummyData.buildNotifications(),
+    chatMessages: const [],
+    likedPosts: {'p2', 'p5'},
+    savedPosts: {'p3'},
+    likedReels: {'r1'},
+    likedComments: const {},
+    settings: const {
+      'notifications': true,
+      'privateAccount': false,
+      'activityStatus': true,
+      'commentControls': 'Everyone',
+      'language': 'English',
+      'archive': false,
+    },
+  );
 
   bool get isLoggedIn => currentUserId != null;
 
@@ -92,17 +96,45 @@ class AppState {
     return users.where((u) => u.id == id).firstOrNull;
   }
 
-  UserModel? userById(String id) =>
-      users.where((u) => u.id == id).firstOrNull;
+  UserModel? userById(String id) => users.where((u) => u.id == id).firstOrNull;
 
-  List<CommentModel> commentsFor(String targetId) => comments
-      .where((c) => c.targetId == targetId)
+  List<CommentModel> commentsFor(String targetId) =>
+      comments.where((c) => c.targetId == targetId).toList().reversed.toList();
+
+  List<CommentModel> rootCommentsFor(String targetId) => comments
+      .where((c) => c.targetId == targetId && c.parentId == null)
       .toList()
       .reversed
       .toList();
 
+  /// All replies under a top-level comment, in the order they were added.
+  List<CommentModel> repliesForRoot(String targetId, String rootId) {
+    final byParent = <String, List<CommentModel>>{};
+    for (final comment in comments) {
+      final parentId = comment.parentId;
+      if (comment.targetId != targetId || parentId == null) continue;
+      byParent.putIfAbsent(parentId, () => <CommentModel>[]).add(comment);
+    }
+    final result = <CommentModel>[];
+    void collect(String id) {
+      for (final reply in byParent[id] ?? const <CommentModel>[]) {
+        result.add(reply);
+        collect(reply.id);
+      }
+    }
+
+    collect(rootId);
+    return result;
+  }
+
+  CommentModel? commentById(String id) =>
+      comments.where((c) => c.id == id).firstOrNull;
+
   int commentCountFor(String targetId) =>
       comments.where((c) => c.targetId == targetId).length;
+
+  int effectiveCommentLikeCount(CommentModel comment) =>
+      comment.likeCount + (likedComments.contains(comment.id) ? 1 : 0);
 
   int effectiveLikeCount(PostModel post) =>
       post.likeCount + (likedPosts.contains(post.id) ? 1 : 0);
@@ -132,6 +164,7 @@ class AppState {
     Set<String>? savedPosts,
     Set<String>? likedReels,
     Set<String>? savedReels,
+    Set<String>? likedComments,
     Set<String>? viewedStories,
     Set<String>? blockedUsers,
     List<String>? searchHistory,
@@ -139,7 +172,9 @@ class AppState {
     Map<String, dynamic>? settings,
   }) {
     return AppState(
-      currentUserId: clearCurrentUser ? null : (currentUserId ?? this.currentUserId),
+      currentUserId: clearCurrentUser
+          ? null
+          : (currentUserId ?? this.currentUserId),
       users: users ?? this.users,
       posts: posts ?? this.posts,
       reels: reels ?? this.reels,
@@ -151,6 +186,7 @@ class AppState {
       savedPosts: savedPosts ?? this.savedPosts,
       likedReels: likedReels ?? this.likedReels,
       savedReels: savedReels ?? this.savedReels,
+      likedComments: likedComments ?? this.likedComments,
       viewedStories: viewedStories ?? this.viewedStories,
       blockedUsers: blockedUsers ?? this.blockedUsers,
       searchHistory: searchHistory ?? this.searchHistory,
@@ -160,24 +196,25 @@ class AppState {
   }
 
   Map<String, dynamic> toJson() => {
-        'currentUserId': currentUserId,
-        'users': users.map((e) => e.toJson()).toList(),
-        'posts': posts.map((e) => e.toJson()).toList(),
-        'reels': reels.map((e) => e.toJson()).toList(),
-        'stories': stories.map((e) => e.toJson()).toList(),
-        'comments': comments.map((e) => e.toJson()).toList(),
-        'notifications': notifications.map((e) => e.toJson()).toList(),
-        'chatMessages': chatMessages.map((e) => e.toJson()).toList(),
-        'likedPosts': likedPosts.toList(),
-        'savedPosts': savedPosts.toList(),
-        'likedReels': likedReels.toList(),
-        'savedReels': savedReels.toList(),
-        'viewedStories': viewedStories.toList(),
-        'blockedUsers': blockedUsers.toList(),
-        'searchHistory': searchHistory,
-        'themeMode': themeMode.index,
-        'settings': settings,
-      };
+    'currentUserId': currentUserId,
+    'users': users.map((e) => e.toJson()).toList(),
+    'posts': posts.map((e) => e.toJson()).toList(),
+    'reels': reels.map((e) => e.toJson()).toList(),
+    'stories': stories.map((e) => e.toJson()).toList(),
+    'comments': comments.map((e) => e.toJson()).toList(),
+    'notifications': notifications.map((e) => e.toJson()).toList(),
+    'chatMessages': chatMessages.map((e) => e.toJson()).toList(),
+    'likedPosts': likedPosts.toList(),
+    'savedPosts': savedPosts.toList(),
+    'likedReels': likedReels.toList(),
+    'savedReels': savedReels.toList(),
+    'likedComments': likedComments.toList(),
+    'viewedStories': viewedStories.toList(),
+    'blockedUsers': blockedUsers.toList(),
+    'searchHistory': searchHistory,
+    'themeMode': themeMode.index,
+    'settings': settings,
+  };
 
   factory AppState.fromJson(Map<String, dynamic> json) {
     final fallback = AppState.initial();
@@ -188,28 +225,35 @@ class AppState {
       reels: _decodeList(json['reels'], ReelModel.fromJson),
       stories: _decodeList(json['stories'], StoryModel.fromJson),
       comments: _decodeList(json['comments'], CommentModel.fromJson),
-      notifications:
-          _decodeList(json['notifications'], NotificationModel.fromJson),
-      chatMessages:
-          _decodeList(json['chatMessages'], ChatMessageModel.fromJson),
+      notifications: _decodeList(
+        json['notifications'],
+        NotificationModel.fromJson,
+      ),
+      chatMessages: _decodeList(
+        json['chatMessages'],
+        ChatMessageModel.fromJson,
+      ),
       likedPosts: _decodeSet(json['likedPosts']),
       savedPosts: _decodeSet(json['savedPosts']),
       likedReels: _decodeSet(json['likedReels']),
       savedReels: _decodeSet(json['savedReels']),
+      likedComments: _decodeSet(json['likedComments']),
       viewedStories: _decodeSet(json['viewedStories']),
       blockedUsers: _decodeSet(json['blockedUsers']),
-      searchHistory: (json['searchHistory'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
+      searchHistory:
+          (json['searchHistory'] as List?)?.map((e) => e.toString()).toList() ??
           const [],
       themeMode: ThemeMode.values[(json['themeMode'] as int?) ?? 0],
       settings: Map<String, dynamic>.from(
-          (json['settings'] as Map?) ?? fallback.settings),
+        (json['settings'] as Map?) ?? fallback.settings,
+      ),
     );
   }
 }
 
-final storageProvider = Provider<StorageService>((ref) => StorageService.instance);
+final storageProvider = Provider<StorageService>(
+  (ref) => StorageService.instance,
+);
 
 final appProvider = NotifierProvider<AppNotifier, AppState>(AppNotifier.new);
 
@@ -219,6 +263,10 @@ class AppNotifier extends Notifier<AppState> {
     final saved = ref.watch(storageProvider).readState();
     if (saved == null) return AppState.initial();
     try {
+      final migrated = PasswordHasher.migrateLegacyState(saved);
+      if (migrated) {
+        unawaited(ref.read(storageProvider).writeState(saved));
+      }
       return AppState.fromJson(saved);
     } catch (_) {
       return AppState.initial();
@@ -246,7 +294,10 @@ class AppNotifier extends Notifier<AppState> {
       }
     }
     if (match == null) return 'No account found with that username or email.';
-    if (match.password != password) return 'Incorrect password. Try again.';
+    if (!match.hasPasswordHash ||
+        !PasswordHasher.verifyPassword(password, match.passwordHash)) {
+      return 'Incorrect password. Try again.';
+    }
     if (state.blockedUsers.contains(match.id)) {
       return 'This account is blocked locally.';
     }
@@ -266,7 +317,9 @@ class AppNotifier extends Notifier<AppState> {
     required String password,
   }) {
     final cleanUsername = username.trim().replaceAll(RegExp(r'\s+'), '_');
-    if (cleanUsername.length < 3) return 'Username must be at least 3 characters.';
+    if (cleanUsername.length < 3) {
+      return 'Username must be at least 3 characters.';
+    }
     if (!RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(cleanUsername)) {
       return 'Use only letters, numbers, dots and underscores.';
     }
@@ -274,10 +327,14 @@ class AppNotifier extends Notifier<AppState> {
       return 'Enter a valid email address.';
     }
     if (password.length < 6) return 'Password must be at least 6 characters.';
-    if (state.users.any((u) => u.username.toLowerCase() == cleanUsername.toLowerCase())) {
+    if (state.users.any(
+      (u) => u.username.toLowerCase() == cleanUsername.toLowerCase(),
+    )) {
       return 'That username is already taken.';
     }
-    if (state.users.any((u) => u.email.toLowerCase() == email.trim().toLowerCase())) {
+    if (state.users.any(
+      (u) => u.email.toLowerCase() == email.trim().toLowerCase(),
+    )) {
       return 'That email is already registered.';
     }
     final user = UserModel(
@@ -287,23 +344,25 @@ class AppNotifier extends Notifier<AppState> {
       bio: 'Hello from my local Instagram demo ✨',
       profileImage: AppDummyData.img('local${state.users.length}', size: 300),
       email: email.trim(),
-      password: password,
+      passwordHash: PasswordHasher.hashPassword(password),
       followers: const [],
       following: const ['u1', 'u2'],
     );
-    _update(state.copyWith(
-      users: [...state.users, user],
-      currentUserId: user.id,
-    ));
+    _update(
+      state.copyWith(users: [...state.users, user], currentUserId: user.id),
+    );
     return null;
   }
 
   String? changePassword({required String current, required String next}) {
     final user = state.currentUser;
     if (user == null) return 'You need to be signed in.';
-    if (user.password != current) return 'Your current password is incorrect.';
+    if (!user.hasPasswordHash ||
+        !PasswordHasher.verifyPassword(current, user.passwordHash)) {
+      return 'Your current password is incorrect.';
+    }
     if (next.length < 6) return 'New password must be at least 6 characters.';
-    _updateCurrentUser(password: next);
+    _updateCurrentUser(passwordHash: PasswordHasher.hashPassword(next));
     return null;
   }
 
@@ -314,7 +373,7 @@ class AppNotifier extends Notifier<AppState> {
     String? website,
     String? profileImage,
     bool? isPrivate,
-    String? password,
+    String? passwordHash,
   }) {
     final user = state.currentUser;
     if (user == null) return;
@@ -325,14 +384,16 @@ class AppNotifier extends Notifier<AppState> {
       website: website,
       profileImage: profileImage,
       isPrivate: isPrivate,
-      password: password,
+      passwordHash: passwordHash,
     );
-    _update(state.copyWith(
-      users: state.users.map((u) => u.id == user.id ? updated : u).toList(),
-      settings: isPrivate == null
-          ? state.settings
-          : {...state.settings, 'privateAccount': isPrivate},
-    ));
+    _update(
+      state.copyWith(
+        users: state.users.map((u) => u.id == user.id ? updated : u).toList(),
+        settings: isPrivate == null
+            ? state.settings
+            : {...state.settings, 'privateAccount': isPrivate},
+      ),
+    );
   }
 
   void updateProfile({
@@ -341,14 +402,13 @@ class AppNotifier extends Notifier<AppState> {
     String? bio,
     String? website,
     String? profileImage,
-  }) =>
-      _updateCurrentUser(
-        username: username,
-        displayName: displayName,
-        bio: bio,
-        website: website,
-        profileImage: profileImage,
-      );
+  }) => _updateCurrentUser(
+    username: username,
+    displayName: displayName,
+    bio: bio,
+    website: website,
+    profileImage: profileImage,
+  );
 
   void togglePrivateAccount() {
     final next = !state.setting<bool>('privateAccount', false);
@@ -383,9 +443,15 @@ class AppNotifier extends Notifier<AppState> {
     required String targetId,
     required String targetType,
     required String text,
+    String? parentId,
   }) {
     final me = state.currentUser;
     if (me == null || text.trim().isEmpty) return;
+    final parent = parentId == null
+        ? null
+        : state.comments
+              .where((c) => c.id == parentId && c.targetId == targetId)
+              .firstOrNull;
     final comment = CommentModel(
       id: 'c_local_${DateTime.now().microsecondsSinceEpoch}',
       targetId: targetId,
@@ -393,8 +459,16 @@ class AppNotifier extends Notifier<AppState> {
       userId: me.id,
       text: text.trim(),
       createdAt: DateTime.now(),
+      parentId: parent?.id,
     );
     _update(state.copyWith(comments: [...state.comments, comment]));
+  }
+
+  void toggleLikeComment(String id) {
+    if (!state.comments.any((c) => c.id == id)) return;
+    final set = Set<String>.from(state.likedComments);
+    set.contains(id) ? set.remove(id) : set.add(id);
+    _update(state.copyWith(likedComments: set));
   }
 
   void deleteComment(String id) {
@@ -402,8 +476,29 @@ class AppNotifier extends Notifier<AppState> {
     if (me == null) return;
     final target = state.comments.where((c) => c.id == id).firstOrNull;
     if (target == null || target.userId != me.id) return;
-    _update(state.copyWith(
-        comments: state.comments.where((c) => c.id != id).toList()));
+
+    // Removing a top-level comment also removes the conversation below it.
+    final removeIds = <String>{id};
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final comment in state.comments) {
+        final parentId = comment.parentId;
+        if (parentId != null &&
+            removeIds.contains(parentId) &&
+            removeIds.add(comment.id)) {
+          changed = true;
+        }
+      }
+    }
+    _update(
+      state.copyWith(
+        comments: state.comments
+            .where((c) => !removeIds.contains(c.id))
+            .toList(),
+        likedComments: state.likedComments.difference(removeIds),
+      ),
+    );
   }
 
   void toggleFollow(String userId) {
@@ -454,9 +549,10 @@ class AppNotifier extends Notifier<AppState> {
   void addSearch(String query) {
     final clean = query.trim();
     if (clean.isEmpty) return;
-    final history = [clean, ...state.searchHistory.where((q) => q != clean)]
-        .take(12)
-        .toList();
+    final history = [
+      clean,
+      ...state.searchHistory.where((q) => q != clean),
+    ].take(12).toList();
     _update(state.copyWith(searchHistory: history));
   }
 
@@ -468,28 +564,36 @@ class AppNotifier extends Notifier<AppState> {
     _update(state.copyWith(blockedUsers: set));
   }
 
-  void markNotificationRead(String id) => _update(state.copyWith(
-        notifications: state.notifications
-            .map((n) => n.id == id ? n.copyWith(isRead: true) : n)
-            .toList(),
-      ));
+  void markNotificationRead(String id) => _update(
+    state.copyWith(
+      notifications: state.notifications
+          .map((n) => n.id == id ? n.copyWith(isRead: true) : n)
+          .toList(),
+    ),
+  );
 
-  void markAllNotificationsRead() => _update(state.copyWith(
-        notifications:
-            state.notifications.map((n) => n.copyWith(isRead: true)).toList(),
-      ));
+  void markAllNotificationsRead() => _update(
+    state.copyWith(
+      notifications: state.notifications
+          .map((n) => n.copyWith(isRead: true))
+          .toList(),
+    ),
+  );
 
-  void sendMessage(String threadUserId, String text) {
+  void sendMessage(String threadUserId, String text, {bool autoReply = true}) {
     final me = state.currentUser;
     if (me == null || text.trim().isEmpty) return;
     final now = DateTime.now();
-    addChatMessage(ChatMessageModel(
-      id: 'm_${now.microsecondsSinceEpoch}',
-      threadUserId: threadUserId,
-      senderId: me.id,
-      text: text.trim(),
-      createdAt: now,
-    ));
+    addChatMessage(
+      ChatMessageModel(
+        id: 'm_${now.microsecondsSinceEpoch}',
+        threadUserId: threadUserId,
+        senderId: me.id,
+        text: text.trim(),
+        createdAt: now,
+      ),
+    );
+    if (!autoReply) return;
     final replies = [
       'Haha, love that! ✨',
       'Tell me more 👀',
@@ -498,13 +602,15 @@ class AppNotifier extends Notifier<AppState> {
       'Let\'s do it!',
     ];
     Timer(const Duration(milliseconds: 1400), () {
-      addChatMessage(ChatMessageModel(
-        id: 'm_${DateTime.now().microsecondsSinceEpoch}',
-        threadUserId: me.id,
-        senderId: threadUserId,
-        text: replies[now.millisecond % replies.length],
-        createdAt: DateTime.now(),
-      ));
+      addChatMessage(
+        ChatMessageModel(
+          id: 'm_${DateTime.now().microsecondsSinceEpoch}',
+          threadUserId: me.id,
+          senderId: threadUserId,
+          text: replies[now.millisecond % replies.length],
+          createdAt: DateTime.now(),
+        ),
+      );
     });
   }
 
